@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Save, User, Building, Shield, Bell } from "lucide-react";
+import { Save, User, Building, Shield, Bell, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,9 +9,11 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export const Pengaturan = () => {
   const { toast } = useToast();
+  const { theme, toggleTheme } = useTheme();
   const [settings, setSettings] = useState({
     // Profile Settings
     namaPerusahaan: "PT. Contoh Perusahaan",
@@ -263,6 +265,20 @@ export const Pengaturan = () => {
                 <Switch
                   checked={settings.autoBackup}
                   onCheckedChange={(checked) => handleChange('autoBackup', checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium flex items-center">
+                    {theme === 'dark' ? <Moon className="w-4 h-4 mr-2" /> : <Sun className="w-4 h-4 mr-2" />}
+                    Mode Gelap
+                  </h3>
+                  <p className="text-sm text-muted-foreground">Aktifkan tema gelap untuk kenyamanan mata</p>
+                </div>
+                <Switch
+                  checked={theme === 'dark'}
+                  onCheckedChange={toggleTheme}
                 />
               </div>
 

@@ -25,9 +25,9 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-background flex">
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-6 bg-background">
         {renderContent()}
       </main>
     </div>
