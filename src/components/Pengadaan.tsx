@@ -5,11 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PengadaanForm } from "./PengadaanForm";
+import { PengadaanDetail } from "./PengadaanDetail";
 import { useGetPengadaan, useDeletePengadaan } from "@/services/pengadaan";
 import { useToast } from "@/hooks/use-toast";
 
 export const Pengadaan = () => {
   const [showForm, setShowForm] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPengadaan, setSelectedPengadaan] = useState<any>(null);
   const { toast } = useToast();
@@ -33,6 +35,11 @@ export const Pengadaan = () => {
   const handleEdit = (pengadaan: any) => {
     setSelectedPengadaan(pengadaan);
     setShowForm(true);
+  };
+
+  const handleViewDetail = (pengadaan: any) => {
+    setSelectedPengadaan(pengadaan);
+    setShowDetail(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -61,6 +68,11 @@ export const Pengadaan = () => {
 
   const handleCloseForm = () => {
     setShowForm(false);
+    setSelectedPengadaan(null);
+  };
+
+  const handleCloseDetail = () => {
+    setShowDetail(false);
     setSelectedPengadaan(null);
   };
 
@@ -131,6 +143,14 @@ export const Pengadaan = () => {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => handleViewDetail(item)}
+                      className="text-blue-600 hover:text-blue-700"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleEdit(item)}
                     >
                       <Edit className="w-4 h-4" />
@@ -154,6 +174,13 @@ export const Pengadaan = () => {
       {showForm && (
         <PengadaanForm
           onClose={handleCloseForm}
+          pengadaan={selectedPengadaan}
+        />
+      )}
+
+      {showDetail && (
+        <PengadaanDetail
+          onClose={handleCloseDetail}
           pengadaan={selectedPengadaan}
         />
       )}
