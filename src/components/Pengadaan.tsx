@@ -1,20 +1,25 @@
 import { useState } from "react";
-import { Plus, Search, Filter, Edit, Trash2, Eye } from "lucide-react";
+import { Plus, Search, Filter, Edit, Trash2, Eye, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PengadaanForm } from "./PengadaanForm";
 import { PengadaanDetail } from "./PengadaanDetail";
+import { PermissionRequestDialog } from "./permissions/PermissionRequestDialog";
 import { useGetPengadaan, useDeletePengadaan } from "@/services/pengadaan";
+import { useCheckEditPermission } from "@/services/permission";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
 export const Pengadaan = () => {
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPengadaan, setSelectedPengadaan] = useState<any>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const { data: pengadaanData = [] } = useGetPengadaan();
   const deletePengadaan = useDeletePengadaan();
@@ -34,6 +39,18 @@ export const Pengadaan = () => {
 
   const handleEdit = (pengadaan: any) => {
     setSelectedPengadaan(pengadaan);
+    
+    // Check if user is admin or has permission
+    if (user?.role === 'admin') {
+      setShowForm(true);
+    } else {
+      // For regular users, check if they have permission or show permission request dialog
+      setShowPermissionDialog(true);
+    }
+  };
+
+  const handlePermissionGranted = () => {
+    setShowPermissionDialog(false);
     setShowForm(true);
   };
 
@@ -152,8 +169,9 @@ export const Pengadaan = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => handleEdit(item)}
+                      className={user?.role !== 'admin' ? 'text-orange-600 hover:text-orange-700' : ''}
                     >
-                      <Edit className="w-4 h-4" />
+                      {user?.role === 'admin' ? <Edit className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
                     </Button>
                     <Button
                       variant="outline"
@@ -182,6 +200,15 @@ export const Pengadaan = () => {
         <PengadaanDetail
           onClose={handleCloseDetail}
           pengadaan={selectedPengadaan}
+        />
+      )}
+
+      {showPermissionDialog && selectedPengadaan && (
+        <PermissionRequestDialog
+          open={showPermissionDialog}
+          onOpenChange={setShowPermissionDialog}
+          pengadaanId={selectedPengadaan.id}
+          pengadaanName={selectedPengadaan.nama}
         />
       )}
     </div>
