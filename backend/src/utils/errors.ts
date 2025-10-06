@@ -1,4 +1,5 @@
 import { logger } from './logger';
+import { Request, Response, NextFunction } from 'express';
 
 /**
  * Custom application error class
@@ -188,9 +189,9 @@ export const createErrorResponse = (
  * Handle async errors in route handlers
  */
 export const asyncHandler = (
-  fn: (req: any, res: any, next: any) => Promise<any>
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<void>
 ) => {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 };
@@ -212,7 +213,7 @@ export const logError = (error: Error, context?: Record<string, unknown>): void 
   const isOperational = isOperationalError(error);
   const logLevel = isOperational ? 'warn' : 'error';
   
-  const logData: any = {
+  const logData: Record<string, unknown> = {
     name: error.name,
     message: error.message,
     stack: error.stack,
@@ -221,8 +222,8 @@ export const logError = (error: Error, context?: Record<string, unknown>): void 
   };
 
   if (error instanceof AppError) {
-    logData.statusCode = error.statusCode;
-    logData.details = error.details;
+    logData['statusCode'] = error.statusCode;
+    logData['details'] = error.details;
   }
 
   logger[logLevel]('Error occurred:', logData);
@@ -231,10 +232,10 @@ export const logError = (error: Error, context?: Record<string, unknown>): void 
 /**
  * Handle unhandled promise rejections
  */
-export const handleUnhandledRejection = (reason: any, promise: Promise<any>): void => {
+export const handleUnhandledRejection = (reason: unknown, promise: Promise<unknown>): void => {
   logger.error('Unhandled Promise Rejection:', {
-    reason: reason?.message || reason,
-    stack: reason?.stack,
+    reason: typeof reason === 'object' && reason && 'message' in reason ? (reason as { message?: unknown }).message : reason,
+    stack: typeof reason === 'object' && reason && 'stack' in reason ? (reason as { stack?: unknown }).stack : undefined,
     promise: promise.toString(),
   });
   
@@ -261,11 +262,20 @@ export const handleUncaughtException = (error: Error): void => {
 /**
  * MongoDB error handler
  */
-export const handleMongoError = (error: any): AppError => {
+export const handleMongoError = (error: unknown): AppError => {
+  const e = error as {
+    code?: number;
+    name?: string;
+    keyValue?: Record<string, unknown>;
+    errors?: Record<string, unknown>;
+    path?: string;
+    value?: unknown;
+    message?: string;
+  };
   // Duplicate key error
-  if (error.code === 11000) {
-    const field = Object.keys(error.keyValue || {})[0];
-    const value = field ? error.keyValue?.[field] : undefined;
+  if (e.code === 11000) {
+    const field = Object.keys(e.keyValue || {})[0];
+    const value = field ? e.keyValue?.[field] : undefined;
     return new ConflictError(
       `${field} '${value}' already exists`,
       `Duplicate value for field: ${field}`
@@ -273,8 +283,13 @@ export const handleMongoError = (error: any): AppError => {
   }
 
   // Validation error
-  if (error.name === 'ValidationError') {
-    const errors = Object.values(error.errors).map((err: any) => err.message);
+  if (e.name === 'ValidationError') {
+    const errorsObj = e.errors ?? {};
+    const errors = Object.values(errorsObj).map((err) =>
+      typeof err === 'object' && err && 'message' in err
+        ? String((err as { message?: unknown }).message)
+        : 'Validation error'
+    );
     return new ValidationError(
       'Validation failed',
       undefined,
@@ -284,34 +299,35 @@ export const handleMongoError = (error: any): AppError => {
   }
 
   // Cast error
-  if (error.name === 'CastError') {
+  if (e.name === 'CastError') {
     return new ValidationError(
-      `Invalid ${error.path}: ${error.value}`,
-      error.path,
-      error.value
+      `Invalid ${String(e.path)}: ${String(e.value)}`,
+      e.path,
+      e.value
     );
   }
 
   // Default to database error
   return new DatabaseError(
     'Database operation failed',
-    error.message
+    String(e.message)
   );
 };
 
 /**
  * JWT error handler
  */
-export const handleJWTError = (error: any): AppError => {
-  if (error.name === 'JsonWebTokenError') {
+export const handleJWTError = (error: unknown): AppError => {
+  const e = error as { name?: string };
+  if (e.name === 'JsonWebTokenError') {
     return new AuthenticationError('Invalid token');
   }
 
-  if (error.name === 'TokenExpiredError') {
+  if (e.name === 'TokenExpiredError') {
     return new AuthenticationError('Token expired');
   }
 
-  if (error.name === 'NotBeforeError') {
+  if (e.name === 'NotBeforeError') {
     return new AuthenticationError('Token not active');
   }
 
@@ -321,30 +337,30 @@ export const handleJWTError = (error: any): AppError => {
 /**
  * Error type guards
  */
-export const isValidationError = (error: any): error is ValidationError => {
+export const isValidationError = (error: unknown): error is ValidationError => {
   return error instanceof ValidationError;
 };
 
-export const isAuthenticationError = (error: any): error is AuthenticationError => {
+export const isAuthenticationError = (error: unknown): error is AuthenticationError => {
   return error instanceof AuthenticationError;
 };
 
-export const isAuthorizationError = (error: any): error is AuthorizationError => {
+export const isAuthorizationError = (error: unknown): error is AuthorizationError => {
   return error instanceof AuthorizationError;
 };
 
-export const isNotFoundError = (error: any): error is NotFoundError => {
+export const isNotFoundError = (error: unknown): error is NotFoundError => {
   return error instanceof NotFoundError;
 };
 
-export const isConflictError = (error: any): error is ConflictError => {
+export const isConflictError = (error: unknown): error is ConflictError => {
   return error instanceof ConflictError;
 };
 
-export const isDatabaseError = (error: any): error is DatabaseError => {
+export const isDatabaseError = (error: unknown): error is DatabaseError => {
   return error instanceof DatabaseError;
 };
 
-export const isExternalServiceError = (error: any): error is ExternalServiceError => {
+export const isExternalServiceError = (error: unknown): error is ExternalServiceError => {
   return error instanceof ExternalServiceError;
 };

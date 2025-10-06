@@ -1,10 +1,10 @@
-import { Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { logger } from './logger';
 
 /**
  * Standard API response interface
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   message: string;
   data?: T;
@@ -280,7 +280,7 @@ export const sendPaginated = <T>(
 export const sendHealthCheck = (
   res: Response,
   status: 'healthy' | 'unhealthy' = 'healthy',
-  checks?: Record<string, any>,
+  checks?: Record<string, unknown>,
   requestId?: string
 ): Response => {
   const statusCode = status === 'healthy' ? 200 : 503;
@@ -462,14 +462,19 @@ export const setApiVersion = (res: Response, version: string = '1.0.0'): void =>
 /**
  * Request ID helper
  */
-export const getRequestId = (req: any): string => {
-  return req.id || req.headers['x-request-id'] || 'unknown';
+export interface RequestWithId extends Request {
+  id?: string;
+  requestId?: string;
+}
+
+export const getRequestId = (req: RequestWithId): string => {
+  return req.id || (req.headers['x-request-id'] as string | undefined) || 'unknown';
 };
 
 /**
  * Response middleware factory
  */
-export const responseMiddleware = (req: any, res: Response, next: any) => {
+export const responseMiddleware = (req: RequestWithId, res: Response, next: NextFunction) => {
   const startTime = Date.now();
   const requestId = getRequestId(req);
   

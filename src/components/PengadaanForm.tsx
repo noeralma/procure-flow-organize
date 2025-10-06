@@ -15,10 +15,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useCreatePengadaan, useUpdatePengadaan } from "@/services/pengadaan";
+import { Pengadaan } from "@/types/pengadaan";
 
 interface PengadaanFormProps {
   onClose: () => void;
-  pengadaan?: any;
+  pengadaan?: Pengadaan;
 }
 
 // Mock exchange rate - in real app, this would come from an API
@@ -157,8 +158,8 @@ export const PengadaanForm = ({ onClose, pengadaan }: PengadaanFormProps) => {
 
       if (pengadaan) {
         await updatePengadaan.mutateAsync({
-          ...pengadaanData,
           id: pengadaan.id,
+          data: pengadaanData,
         });
         toast({
           title: "Berhasil!",

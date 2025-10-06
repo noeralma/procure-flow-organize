@@ -1,7 +1,5 @@
 import PengadaanModel from '../models/Pengadaan';
 import {
-  CreatePengadaanDTO,
-  UpdatePengadaanDTO,
   PengadaanResponse,
   PengadaanQueryParams,
   PaginatedPengadaanResponse,
@@ -13,13 +11,78 @@ import { AppError } from '../utils/errors';
 
 class PengadaanService {
   /**
+   * Normalize numeric-like string fields to canonical numeric strings.
+   * Keeps schema types (string) but removes separators and non-numeric chars.
+   */
+  private normalizeNumericString(value: unknown): string | undefined {
+    if (value === null || value === undefined) return undefined;
+    const str = String(value).trim();
+    if (!str) return undefined;
+    // Allow digits, optional decimal and minus; strip other characters like commas and currency symbols
+    const cleaned = str.replace(/[^0-9.-]+/g, '');
+    // If cleaned is just '-' or '.', treat as undefined
+    if (!cleaned || cleaned === '-' || cleaned === '.' || cleaned === '-.' || cleaned === '.-') return undefined;
+    return cleaned;
+  }
+
+  /**
+   * Coerce legacy and numeric fields to expected formats for persistence.
+   */
+  private normalizePengadaanPayload(data: Record<string, unknown>): Record<string, unknown> {
+    const numericFields = [
+      'nilai',
+      'nilaiAnggaranIdr',
+      'nilaiAnggaranUsd',
+      'nilaiHpsAmount',
+      'nilaiHpsEqRupiah',
+      'nilaiHpsPortiTahun',
+      'nilaiPenunjukanAmount',
+      'nilaiPenunjukanEqRupiah',
+      'nilaiKontrakRupiah',
+      'nilaiKontrakUsd',
+      'costSavingRp',
+    ];
+
+    const normalized: Record<string, unknown> = { ...data };
+
+    for (const field of numericFields) {
+      if (Object.prototype.hasOwnProperty.call(data, field)) {
+        const coerced = this.normalizeNumericString((data as Record<string, unknown>)[field]);
+        if (coerced !== undefined) {
+          normalized[field] = coerced;
+        } else {
+          // Preserve empty string if provided, else remove field to let mongoose defaults/validation apply
+          if ((data as Record<string, unknown>)[field] === '') {
+            normalized[field] = '';
+          } else {
+            delete normalized[field];
+          }
+        }
+      }
+    }
+
+    // Normalize currency codes to uppercase if present
+    for (const currencyField of ['nilaiHpsCurrency', 'nilaiPenunjukanCurrency']) {
+      if (typeof (normalized as Record<string, unknown>)[currencyField] === 'string') {
+        normalized[currencyField] = String((normalized as Record<string, unknown>)[currencyField]).toUpperCase();
+      }
+    }
+
+    return normalized;
+  }
+  /**
    * Create a new pengadaan
    */
-  async createPengadaan(data: CreatePengadaanDTO): Promise<PengadaanResponse> {
+  async createPengadaan(data: Record<string, unknown>): Promise<PengadaanResponse> {
     try {
-      logger.info('Creating new pengadaan', { nama: data.nama });
+      const nama = typeof (data as Record<string, unknown>)['nama'] === 'string'
+        ? (data as Record<string, unknown>)['nama']
+        : 'unknown';
+      logger.info('Creating new pengadaan', { nama });
       
-      const pengadaan = new PengadaanModel(data);
+      // Normalize payload before persistence; Mongoose will enforce schema
+      const payload = this.normalizePengadaanPayload(data as Record<string, unknown>);
+      const pengadaan = new PengadaanModel(payload as Record<string, unknown>);
       const savedPengadaan = await pengadaan.save();
       
       logger.info('Pengadaan created successfully', { id: savedPengadaan.id });
@@ -58,11 +121,11 @@ class PengadaanService {
       } = params;
 
       // Build query
-      const query: any = {};
+      const query: Record<string, unknown> = {};
 
       // Text search
       if (search) {
-        query.$or = [
+        query['$or'] = [
           { nama: { $regex: search, $options: 'i' } },
           { deskripsi: { $regex: search, $options: 'i' } },
           { vendor: { $regex: search, $options: 'i' } },
@@ -72,33 +135,33 @@ class PengadaanService {
 
       // Filter by kategori
       if (kategori) {
-        query.kategori = kategori;
+        query['kategori'] = kategori;
       }
 
       // Filter by status
       if (status) {
-        query.status = status;
+        query['status'] = status;
       }
 
       // Filter by vendor
       if (vendor) {
-        query.vendor = { $regex: vendor, $options: 'i' };
+        query['vendor'] = { $regex: vendor, $options: 'i' };
       }
 
       // Date range filter
       if (dateFrom || dateTo) {
-        query.createdAt = {};
+        query['createdAt'] = {};
         if (dateFrom) {
-          query.createdAt.$gte = new Date(dateFrom);
+          (query['createdAt'] as Record<string, unknown>)['$gte'] = new Date(dateFrom);
         }
         if (dateTo) {
-          query.createdAt.$lte = new Date(dateTo);
+          (query['createdAt'] as Record<string, unknown>)['$lte'] = new Date(dateTo);
         }
       }
 
       // Calculate pagination
       const skip = (page - 1) * limit;
-      const sortOptions: any = {};
+      const sortOptions: Record<string, 1 | -1> = {};
       sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
       // Execute query
@@ -169,7 +232,7 @@ class PengadaanService {
   /**
    * Update pengadaan by ID
    */
-  async updatePengadaan(id: string, data: UpdatePengadaanDTO): Promise<PengadaanResponse> {
+  async updatePengadaan(id: string, data: Record<string, unknown>): Promise<PengadaanResponse> {
     try {
       logger.info('Updating pengadaan', { id });
       
@@ -180,7 +243,8 @@ class PengadaanService {
       }
 
       // Update fields
-      Object.assign(pengadaan, data);
+      const payload = this.normalizePengadaanPayload(data as Record<string, unknown>);
+      Object.assign(pengadaan, payload);
       const updatedPengadaan = await pengadaan.save();
 
       logger.info('Pengadaan updated successfully', { id });
@@ -234,7 +298,7 @@ class PengadaanService {
       
       logger.info('Search completed', { resultsCount: pengadaanList.length });
       
-      return pengadaanList.slice(0, limit).map((item: any) => ({
+      return pengadaanList.slice(0, limit).map((item) => ({
         ...item,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
@@ -296,8 +360,8 @@ class PengadaanService {
 
     const results = await PengadaanModel.aggregate(pipeline);
     
-    return results.reduce((acc, item) => {
-      acc[item._id] = item.count;
+    return results.reduce<Record<string, number>>((acc, item) => {
+      acc[item._id as string] = item.count as number;
       return acc;
     }, {});
   }
@@ -368,14 +432,14 @@ class PengadaanService {
   /**
    * Export pengadaan data
    */
-  async exportPengadaan(format: 'json' | 'csv' = 'json'): Promise<any> {
+  async exportPengadaan(format: 'json' | 'csv' = 'json'): Promise<Record<string, unknown>[]> {
     try {
       logger.info('Exporting pengadaan data', { format });
       
       const pengadaanList = await PengadaanModel.find({}).lean();
       
       if (format === 'json') {
-        return pengadaanList;
+        return pengadaanList as Record<string, unknown>[];
       }
       
       // For CSV format, you might want to implement CSV conversion

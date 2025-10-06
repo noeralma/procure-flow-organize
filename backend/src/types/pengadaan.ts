@@ -1,4 +1,4 @@
-import { Document, Model } from 'mongoose';
+import { Document, Model, Types } from 'mongoose';
 
 /**
  * Base Pengadaan interface matching the frontend structure
@@ -82,22 +82,22 @@ export interface IPengadaan {
  */
 export interface IPengadaanDocument extends IPengadaan, Document {
   id: string;
-  createdBy: any; // ObjectId reference
-  lastModifiedBy?: any; // ObjectId reference
+  createdBy: Types.ObjectId; // ObjectId reference
+  lastModifiedBy?: Types.ObjectId; // ObjectId reference
   isEditable: boolean;
   editHistory: Array<{
-    userId: any; // ObjectId reference
+    userId: Types.ObjectId; // ObjectId reference
     action: 'created' | 'updated' | 'submitted' | 'approved' | 'rejected';
     timestamp: Date;
-    changes?: any;
+    changes?: Record<string, unknown>;
     reason?: string;
   }>;
   submittedAt?: Date;
-  submittedBy?: any; // ObjectId reference
+  submittedBy?: Types.ObjectId; // ObjectId reference
   createdAt: Date;
   updatedAt: Date;
   toResponse(): PengadaanResponse;
-  addEditHistory(userId: string, action: string, changes?: any, reason?: string): void;
+  addEditHistory(userId: string, action: string, changes?: Record<string, unknown>, reason?: string): void;
   canUserEdit(userId: string, userRole: string): boolean;
   submitForm(userId: string): void;
   approveForm(userId: string, reason?: string): void;
@@ -110,19 +110,19 @@ export interface IPengadaanDocument extends IPengadaan, Document {
 export interface IPengadaanModel extends Model<IPengadaanDocument> {
   findByCustomId(customId: string): Promise<IPengadaanDocument | null>;
   searchByText(searchTerm: string): Promise<IPengadaanDocument[]>;
-  findByUser(userId: string, options?: any): Promise<IPengadaanDocument[]>;
-  findSubmitted(options?: any): Promise<IPengadaanDocument[]>;
+  findByUser(userId: string, options?: Record<string, unknown>): Promise<IPengadaanDocument[]>;
+  findSubmitted(options?: Record<string, unknown>): Promise<IPengadaanDocument[]>;
 }
 
 /**
  * Create Pengadaan DTO (Data Transfer Object)
  */
-export interface CreatePengadaanDTO extends Omit<IPengadaan, 'id'> {}
+export type CreatePengadaanDTO = Omit<IPengadaan, 'id'>;
 
 /**
  * Update Pengadaan DTO
  */
-export interface UpdatePengadaanDTO extends Partial<IPengadaan> {}
+export type UpdatePengadaanDTO = Partial<IPengadaan>;
 
 /**
  * Pengadaan response interface

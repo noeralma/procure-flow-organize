@@ -1,6 +1,7 @@
 import UserModel, { UserRole, UserStatus } from '../models/User';
 import { AppError } from '../utils/errors';
 import { logger } from '../utils/logger';
+import { generateRefreshToken } from '../middleware/auth';
 
 // Registration data interface
 export interface RegisterData {
@@ -12,6 +13,7 @@ export interface RegisterData {
   department?: string;
   position?: string;
   phoneNumber?: string;
+  role?: UserRole;
 }
 
 // Login data interface
@@ -24,6 +26,7 @@ export interface LoginData {
 export interface AuthResponse {
   user: object;
   token: string;
+  refreshToken: string;
 }
 
 // Password change interface
@@ -58,12 +61,17 @@ class AuthService {
 
       if (existingUser) {
         if (existingUser.email === userData.email.toLowerCase()) {
-          throw new AppError('Email already registered', 400);
+          throw new AppError('Email already registered', 409);
         }
         if (existingUser.username === userData.username) {
-          throw new AppError('Username already taken', 400);
+          throw new AppError('Username already taken', 409);
         }
       }
+
+      // Determine role (allow override in test environment for integration tests)
+      const assignedRole = (process.env['NODE_ENV'] === 'test' && userData.role)
+        ? userData.role
+        : UserRole.USER;
 
       // Create new user
       const user = new UserModel({
@@ -75,7 +83,7 @@ class AuthService {
         department: userData.department,
         position: userData.position,
         phoneNumber: userData.phoneNumber,
-        role: UserRole.USER, // Default role
+        role: assignedRole, // Default role USER; overridden in tests if provided
         status: UserStatus.ACTIVE,
       });
 
@@ -83,6 +91,16 @@ class AuthService {
 
       // Generate auth token
       const token = user.generateAuthToken();
+
+      // Generate refresh token
+      const refreshTokenPayload = {
+        userId: String(user._id),
+        email: user.email,
+        role: user.role,
+        status: user.status,
+      };
+      
+      const refreshToken = generateRefreshToken(refreshTokenPayload);
 
       // Update last login
       user.lastLogin = new Date();
@@ -93,13 +111,17 @@ class AuthService {
       return {
         user: user.toResponse(),
         token,
+        refreshToken,
       };
     } catch (error) {
+      // Use console.log to ensure visibility in test runs where console.error may be mocked
+      console.log('Registration error (debug):', error);
       logger.error('Registration error:', error);
       if (error instanceof AppError) {
         throw error;
       }
-      throw new AppError('Registration failed', 500);
+      // Let non-AppError errors propagate so the global error handler can classify them
+      throw error as Error;
     }
   }
 
@@ -126,6 +148,16 @@ class AuthService {
       // Generate auth token
       const token = user.generateAuthToken();
 
+      // Generate refresh token
+      const refreshTokenPayload = {
+        userId: String(user._id),
+        email: user.email,
+        role: user.role,
+        status: user.status,
+      };
+      
+      const refreshToken = generateRefreshToken(refreshTokenPayload);
+
       // Update last login
       user.lastLogin = new Date();
       await user.save();
@@ -135,6 +167,7 @@ class AuthService {
       return {
         user: user.toResponse(),
         token,
+        refreshToken,
       };
     } catch (error) {
       logger.error('Login error:', error);
@@ -146,11 +179,80 @@ class AuthService {
   }
 
   /**
+   * Verify refresh token
+   */
+  async verifyRefreshToken(refreshToken: string): Promise<{ userId: string; email: string; role: UserRole; status: UserStatus }> {
+    try {
+      const { verifyRefreshToken } = await import('../middleware/auth');
+      const decoded = await verifyRefreshToken(refreshToken);
+      
+      return {
+        userId: decoded.userId,
+        email: decoded.email,
+        role: decoded.role,
+        status: decoded.status,
+      };
+    } catch (error) {
+      logger.error('Refresh token verification error:', error);
+      throw new AppError('Invalid refresh token', 401);
+    }
+  }
+
+  /**
+   * Refresh token
+   */
+  async refreshToken(userId: string): Promise<AuthResponse> {
+    try {
+      const user = await UserModel.findById(userId);
+
+      if (!user) {
+        throw new AppError('User not found', 404);
+      }
+
+      // Check if user is active
+      if (user.status !== UserStatus.ACTIVE) {
+        throw new AppError('Account is not active', 401);
+      }
+
+      // Generate new auth token
+      const token = user.generateAuthToken();
+
+      // Generate new refresh token
+      const refreshTokenPayload = {
+        userId: String(user._id),
+        email: user.email,
+        role: user.role,
+        status: user.status,
+      };
+      
+      const refreshToken = generateRefreshToken(refreshTokenPayload);
+
+      // Update last login
+      user.lastLogin = new Date();
+      await user.save();
+
+      logger.info(`Token refreshed for user: ${user.email}`);
+
+      return {
+        user: user.toResponse(),
+        token,
+        refreshToken,
+      };
+    } catch (error) {
+      logger.error('Refresh token error:', error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError('Token refresh failed', 500);
+    }
+  }
+
+  /**
    * Get user profile by ID
    */
   async getProfile(userId: string): Promise<object> {
     try {
-      const user = await UserModel.findOne({ id: userId });
+      const user = await UserModel.findById(userId);
 
       if (!user) {
         throw new AppError('User not found', 404);
@@ -171,7 +273,7 @@ class AuthService {
    */
   async updateProfile(userId: string, updateData: ProfileUpdateData): Promise<object> {
     try {
-      const user = await UserModel.findOne({ id: userId });
+      const user = await UserModel.findById(userId);
 
       if (!user) {
         throw new AppError('User not found', 404);
@@ -267,7 +369,7 @@ class AuthService {
       const totalPages = Math.ceil(total / limit);
 
       return {
-        users: users.map(user => user.toResponse()),
+        users: users.map((user) => user.toResponse()),
         total,
         page,
         totalPages,
@@ -367,7 +469,7 @@ class AuthService {
       });
 
       if (existingUser) {
-        throw new AppError('User already exists', 400);
+        throw new AppError('User already exists', 409);
       }
 
       // Create admin user
@@ -383,11 +485,22 @@ class AuthService {
       // Generate auth token
       const token = user.generateAuthToken();
 
+      // Generate refresh token
+      const refreshTokenPayload = {
+        userId: String(user._id),
+        email: user.email,
+        role: user.role,
+        status: user.status,
+      };
+      
+      const refreshToken = generateRefreshToken(refreshTokenPayload);
+
       logger.info(`Admin user created: ${user.email}`);
 
       return {
         user: user.toResponse(),
         token,
+        refreshToken,
       };
     } catch (error) {
       logger.error('Create admin error:', error);

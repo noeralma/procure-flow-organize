@@ -205,10 +205,11 @@ export const detailedHealthCheck = async (
       dependenciesStatus: dependencies.status,
     });
     
+    // Pass only the checks object and let helper compose standard fields
     sendHealthCheck(
       res,
       healthData.status,
-      healthData,
+      { checks: healthData.checks },
       requestId
     );
   } catch (error) {

@@ -1,6 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/services/api';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+// API base is provided by shared apiClient using VITE_API_URL
+
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
 
 // Types
 export interface Permission {
@@ -42,156 +49,48 @@ export interface PermissionStats {
 const permissionApi = {
   // Request permission
   requestPermission: async (data: PermissionRequest): Promise<Permission> => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/permissions/request`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to request permission');
-    }
-
-    const result = await response.json();
+    const result = await apiClient.post<ApiResponse<Permission>>('/permissions/request', data);
     return result.data;
   },
 
   // Get user's permissions
   getUserPermissions: async (page = 1, limit = 10): Promise<{ permissions: Permission[]; total: number; page: number; totalPages: number }> => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/permissions/my-requests?page=${page}&limit=${limit}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch permissions');
-    }
-
-    const result = await response.json();
+    const result = await apiClient.get<ApiResponse<{ permissions: Permission[]; total: number; page: number; totalPages: number }>>(`/permissions/my-requests?page=${page}&limit=${limit}`);
     return result.data;
   },
 
   // Check edit permission
   checkEditPermission: async (pengadaanId: string): Promise<{ hasPermission: boolean; permission?: Permission }> => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/permissions/check/${pengadaanId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to check permission');
-    }
-
-    const result = await response.json();
+    const result = await apiClient.get<ApiResponse<{ hasPermission: boolean; permission?: Permission }>>(`/permissions/check/${pengadaanId}`);
     return result.data;
   },
 
   // Revoke permission
   revokePermission: async (permissionId: string): Promise<void> => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/permissions/${permissionId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to revoke permission');
-    }
+    await apiClient.delete<ApiResponse<void>>(`/permissions/${permissionId}`);
   },
 
   // Admin: Get pending requests
   getPendingRequests: async (page = 1, limit = 10): Promise<{ permissions: Permission[]; total: number; page: number; totalPages: number }> => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/permissions/pending?page=${page}&limit=${limit}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch pending requests');
-    }
-
-    const result = await response.json();
+    const result = await apiClient.get<ApiResponse<{ permissions: Permission[]; total: number; page: number; totalPages: number }>>(`/permissions/pending?page=${page}&limit=${limit}`);
     return result.data;
   },
 
   // Admin: Respond to request
   respondToRequest: async (permissionId: string, data: PermissionResponse): Promise<Permission> => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/permissions/${permissionId}/respond`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to respond to request');
-    }
-
-    const result = await response.json();
+    const result = await apiClient.put<ApiResponse<Permission>>(`/permissions/${permissionId}/respond`, data);
     return result.data;
   },
 
   // Admin: Get permission stats
   getPermissionStats: async (): Promise<PermissionStats> => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/permissions/stats`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch permission stats');
-    }
-
-    const result = await response.json();
+    const result = await apiClient.get<ApiResponse<PermissionStats>>('/permissions/stats');
     return result.data;
   },
 
   // Admin: Bulk respond to requests
   bulkRespondToRequests: async (data: { permissionIds: string[]; status: 'approved' | 'rejected'; response?: string }): Promise<{ processed: number; failed: number }> => {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${API_BASE_URL}/permissions/bulk-respond`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to bulk respond to requests');
-    }
-
-    const result = await response.json();
+    const result = await apiClient.post<ApiResponse<{ processed: number; failed: number }>>('/permissions/bulk-respond', data);
     return result.data;
   },
 };

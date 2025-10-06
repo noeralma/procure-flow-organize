@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { logger } from './utils/logger';
 
 const app = express();
 const port = 3001;
@@ -36,7 +37,7 @@ app.get('/api/health', (_req, res) => {
 
 // Start server
 app.listen(port, () => {
-  console.log(`🚀 Simple server is running on port ${port}`);
-  console.log(`🌐 API Base URL: http://localhost:${port}`);
-  console.log(`🏥 Health Check: http://localhost:${port}/health`);
+  logger.info(`🚀 Simple server is running on port ${port}`);
+  logger.info(`🌐 API Base URL: http://localhost:${port}`);
+  logger.info(`🏥 Health Check: http://localhost:${port}/health`);
 });

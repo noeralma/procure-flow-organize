@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { Request, Response, NextFunction } from 'express';
+import { ParamsDictionary } from 'express-serve-static-core';
+import { ParsedQs } from 'qs';
 import { ValidationError } from './errors';
 import { PengadaanStatus, PengadaanKategori, Currency } from '../types/pengadaan';
 
@@ -44,6 +47,14 @@ export const commonSchemas = {
     /^(\+62|62|0)[0-9]{8,13}$/,
     'Invalid Indonesian phone number format'
   ),
+  
+  // Enhanced password validation schema
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters long')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
+      'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'
+    ),
   
   // URL validation
   url: z.string().url('Invalid URL format'),
@@ -264,10 +275,10 @@ export const pengadaanSchemas = {
  * Validation middleware factory
  */
 export const validate = (schema: z.ZodSchema) => {
-  return (req: any, _res: any, next: any) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     try {
       // Determine what to validate based on request method and content
-      let dataToValidate: any;
+      let dataToValidate: unknown;
       
       if (req.method === 'GET' || req.method === 'DELETE') {
         // Validate query parameters
@@ -281,9 +292,9 @@ export const validate = (schema: z.ZodSchema) => {
       
       // Replace original data with validated data
       if (req.method === 'GET' || req.method === 'DELETE') {
-        req.query = validatedData;
+        req.query = validatedData as ParsedQs;
       } else {
-        req.body = validatedData;
+        req.body = validatedData as Record<string, unknown>;
       }
       
       next();
@@ -292,7 +303,7 @@ export const validate = (schema: z.ZodSchema) => {
         const validationErrors = error.errors.map(err => ({
           field: err.path.join('.'),
           message: err.message,
-          value: (err as any).input || 'unknown',
+          value: 'unknown',
         }));
         
         const firstError = validationErrors[0];
@@ -315,7 +326,7 @@ export const validate = (schema: z.ZodSchema) => {
  * Validate ObjectId parameter
  */
 export const validateObjectId = (paramName: string = 'id') => {
-  return (req: any, _res: any, next: any) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     try {
       const id = req.params[paramName];
       commonSchemas.objectId.parse(id);
@@ -334,7 +345,7 @@ export const validateObjectId = (paramName: string = 'id') => {
  * Validate custom ID parameter
  */
 export const validateCustomId = (paramName: string = 'id') => {
-  return (req: any, _res: any, next: any) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     try {
       const id = req.params[paramName];
       commonSchemas.customId.parse(id);
@@ -351,49 +362,58 @@ export const validateCustomId = (paramName: string = 'id') => {
 
 /**
  * Sanitize input data
+ * Returns the same structural type as provided, with dangerous keys/characters removed.
  */
-export const sanitizeInput = (data: any): any => {
+export const sanitizeInput = <T>(data: T): T => {
   if (typeof data === 'string') {
     // Remove potentially dangerous characters
-    return data
+    return (
+      data
       .trim()
       .replace(/[<>"'&]/g, '') // Remove HTML/XML characters
-      .replace(/\$ne|\$gt|\$lt|\$gte|\$lte|\$in|\$nin|\$regex/gi, ''); // Remove MongoDB operators
+      .replace(/\$ne|\$gt|\$lt|\$gte|\$lte|\$in|\$nin|\$regex/gi, '')
+    ) as unknown as T; // Remove MongoDB operators
   }
   
   if (Array.isArray(data)) {
-    return data.map(sanitizeInput);
+    return (data as unknown[]).map(sanitizeInput) as unknown as T;
   }
   
   if (data && typeof data === 'object') {
-    const sanitized: any = {};
-    for (const [key, value] of Object.entries(data)) {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
       // Skip prototype pollution attempts
       if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
         continue;
       }
+      
+      // Skip MongoDB operators as keys
+      if (key.startsWith('$')) {
+        continue;
+      }
+      
       sanitized[key] = sanitizeInput(value);
     }
-    return sanitized;
+    return sanitized as unknown as T;
   }
   
-  return data;
+  return data as T;
 };
 
 /**
  * Sanitization middleware
  */
-export const sanitize = (req: any, _res: any, next: any) => {
+export const sanitize = (req: Request, _res: Response, next: NextFunction) => {
   if (req.body) {
     req.body = sanitizeInput(req.body);
   }
   
   if (req.query) {
-    req.query = sanitizeInput(req.query);
+    req.query = sanitizeInput(req.query) as ParsedQs;
   }
   
   if (req.params) {
-    req.params = sanitizeInput(req.params);
+    req.params = sanitizeInput(req.params) as ParamsDictionary;
   }
   
   next();
@@ -407,7 +427,7 @@ export const validateFileUpload = (options: {
   maxSize?: number;
   required?: boolean;
 }) => {
-  return (req: any, _res: any, next: any) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     const { allowedTypes = [], maxSize = 5 * 1024 * 1024, required = false } = options;
     
     if (!req.file && required) {
@@ -441,7 +461,7 @@ export const validateFileUpload = (options: {
 /**
  * Rate limiting validation
  */
-export const validateRateLimit = (_req: any, _res: any, next: any) => {
+export const validateRateLimit = (_req: Request, _res: Response, next: NextFunction) => {
   // This would typically be handled by express-rate-limit middleware
   // But we can add custom validation here if needed
   next();

@@ -29,7 +29,7 @@ const parseResult = envSchema.safeParse(process.env);
 
 if (!parseResult.success) {
   console.error('❌ Invalid environment variables:');
-  console.error(parseResult.error.format());
+  console.error(JSON.stringify(parseResult.error.format(), null, 2));
   process.exit(1);
 }
 
@@ -94,7 +94,22 @@ if (config.isProduction) {
   }
 }
 
-console.log('✅ Environment configuration loaded successfully');
-console.log(`📊 Environment: ${config.nodeEnv}`);
-console.log(`🚀 Port: ${config.port}`);
-console.log(`🗄️  Database: ${config.mongodbUri.replace(/\/\/.*@/, '//*****@')}`);
+// Log successful configuration load (only after logger is available)
+if (process.env['NODE_ENV'] !== 'test') {
+  // Use setTimeout to ensure logger is initialized after this module
+  setTimeout(() => {
+    void (async () => {
+      try {
+        const { logger } = await import('../utils/logger');
+        logger.info('✅ Environment configuration loaded successfully');
+        logger.info(`📊 Environment: ${config.nodeEnv}`);
+        logger.info(`🚀 Port: ${config.port}`);
+        logger.info(`🗄️  Database: ${config.mongodbUri.replace(/\/\/.*@/, '//*****@')}`);
+      } catch {
+        console.log('✅ Environment configuration loaded successfully');
+        console.log(`📊 Environment: ${config.nodeEnv}`);
+        console.log(`🚀 Port: ${config.port}`);
+      }
+    })();
+  }, 0);
+}

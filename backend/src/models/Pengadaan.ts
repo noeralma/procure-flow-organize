@@ -381,13 +381,13 @@ const pengadaanSchema = new Schema<IPengadaanDocument>(
     versionKey: false,
     toJSON: {
       transform: (_doc, ret) => {
-        delete ret._id;
+        delete ret['_id'];
         return ret;
       },
     },
     toObject: {
       transform: (_doc, ret) => {
-        delete ret._id;
+        delete ret['_id'];
         return ret;
       },
     },
@@ -428,7 +428,7 @@ pengadaanSchema.methods['toResponse'] = function (): object {
 };
 
 // Method to add edit history entry
-pengadaanSchema.methods['addEditHistory'] = function (userId: string, action: string, changes?: any, reason?: string) {
+pengadaanSchema.methods['addEditHistory'] = function (userId: string, action: string, changes?: Record<string, unknown>, reason?: string) {
   this['editHistory'].push({
     userId,
     action,
@@ -469,13 +469,13 @@ pengadaanSchema.methods['submitForm'] = function (userId: string) {
 
 // Method to approve form (admin only)
 pengadaanSchema.methods['approveForm'] = function (userId: string, reason?: string) {
-  this['addEditHistory'](userId, 'approved', null, reason);
+  this['addEditHistory'](userId, 'approved', undefined, reason);
 };
 
 // Method to reject form (admin only)
 pengadaanSchema.methods['rejectForm'] = function (userId: string, reason: string) {
   this['isEditable'] = true;
-  this['addEditHistory'](userId, 'rejected', null, reason);
+  this['addEditHistory'](userId, 'rejected', undefined, reason);
 };
 
 // Static methods
@@ -490,13 +490,13 @@ pengadaanSchema.statics['searchByText'] = function (searchTerm: string) {
 };
 
 // Static method to find by user
-pengadaanSchema.statics['findByUser'] = function (userId: string, options: any = {}) {
+pengadaanSchema.statics['findByUser'] = function (userId: string, options: Record<string, unknown> = {}) {
   const query = { createdBy: userId };
   return this.find(query, null, options).populate('createdBy lastModifiedBy submittedBy', 'firstName lastName email');
 };
 
 // Static method to find submitted forms
-pengadaanSchema.statics['findSubmitted'] = function (options: any = {}) {
+pengadaanSchema.statics['findSubmitted'] = function (options: Record<string, unknown> = {}) {
   const query = { submittedAt: { $exists: true } };
   return this.find(query, null, options).populate('createdBy lastModifiedBy submittedBy', 'firstName lastName email');
 };

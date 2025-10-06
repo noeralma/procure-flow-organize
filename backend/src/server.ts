@@ -10,6 +10,7 @@ import { errorHandler } from '@/middleware/errorHandler';
 import { notFoundHandler } from '@/middleware/errorHandler';
 import { requestLogger } from '@/middleware/security';
 import pengadaanRoutes from '@/routes/pengadaanRoutes';
+import apiRoutes from '@/routes/index';
 import healthRoutes from '@/routes/healthRoutes';
 import { logger } from '@/utils/logger';
 
@@ -83,13 +84,8 @@ class Server {
     // Health check
     this.app.use('/health', healthRoutes);
 
-    // Import main API routes synchronously
-    try {
-      const apiRoutes = require('./routes/index').default;
-      this.app.use(config.apiPrefix, apiRoutes);
-    } catch (error) {
-      logger.error('Failed to load API routes:', error);
-    }
+    // Mount main API routes synchronously
+    this.app.use(config.apiPrefix, apiRoutes);
 
     // API routes (legacy - will be moved to index.ts)
     this.app.use(`${config.apiPrefix}/${config.apiVersion}/pengadaan`, pengadaanRoutes);
@@ -120,10 +116,21 @@ class Server {
       
       // Start server
       this.app.listen(this.port, () => {
+        logger.info("Server starting...", {
+          port: config.port,
+          environment: config.nodeEnv,
+          apiVersion: config.apiVersion
+        });
         logger.info(`🚀 Server is running on port ${this.port}`);
         logger.info(`📊 Environment: ${config.nodeEnv}`);
         logger.info(`🌐 API Base URL: http://localhost:${this.port}${config.apiPrefix}/${config.apiVersion}`);
         logger.info(`🏥 Health Check: http://localhost:${this.port}/health`);
+        logger.info("Server started successfully", {
+          port: config.port,
+          environment: config.nodeEnv,
+          pid: process.pid,
+          uptime: process.uptime()
+        });
       });
     } catch (error) {
       logger.error('❌ Failed to start server:', error);
@@ -140,8 +147,8 @@ class Server {
   }
 }
 
-// Start server if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Start server outside of test environment
+if (config.nodeEnv !== 'test') {
   const server = new Server();
   server.start().catch((error) => {
     logger.error('❌ Server startup failed:', error);

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import { config } from './environment';
 import { logger } from '../utils/logger';
 
@@ -12,6 +13,7 @@ const mongooseOptions: mongoose.ConnectOptions = {
 
 // Connection state tracking
 let isConnected = false;
+let memoryServer: MongoMemoryServer | null = null;
 
 /**
  * Connect to MongoDB database with fallback options
@@ -41,14 +43,33 @@ export const connectDatabase = async (): Promise<void> => {
         logger.info('✅ Database connected successfully to local MongoDB');
       } catch (localError) {
         logger.error('❌ Both primary and local MongoDB connections failed');
-        logger.warn('⚠️  Continuing without database connection for development');
-        isConnected = false;
         
-        // Don't throw error in development mode, just warn
-        if (config.nodeEnv === 'production') {
+        // In development/test, fallback to in-memory MongoDB to keep app usable
+        if (config.isDevelopment || config.isTest) {
+          try {
+            logger.warn('🧪 Starting in-memory MongoDB server for development/test...');
+            memoryServer = await MongoMemoryServer.create();
+            const memUri = memoryServer.getUri();
+            await mongoose.connect(memUri, mongooseOptions);
+            isConnected = true;
+            logger.info('✅ Connected to in-memory MongoDB');
+          } catch (memError) {
+            logger.error('❌ Failed to start/connect to in-memory MongoDB', memError);
+            logger.warn('⚠️  Continuing without database connection for development');
+            isConnected = false;
+            
+            // Don't throw error in development mode, just warn
+            if (config.nodeEnv === 'production') {
+              throw new Error(`Database connection failed: ${primaryError instanceof Error ? primaryError.message : 'Unknown error'}`);
+            }
+            return;
+          }
+        } else {
+          logger.warn('⚠️  Continuing without database connection');
+          isConnected = false;
+          // In production, fail hard
           throw new Error(`Database connection failed: ${primaryError instanceof Error ? primaryError.message : 'Unknown error'}`);
         }
-        return;
       }
     }
     
@@ -81,6 +102,18 @@ export const disconnectDatabase = async (): Promise<void> => {
     await mongoose.disconnect();
     isConnected = false;
     logger.info('✅ MongoDB disconnected successfully');
+    
+    // Stop in-memory server if running
+    if (memoryServer) {
+      try {
+        await memoryServer.stop();
+        logger.info('🧪 In-memory MongoDB server stopped');
+      } catch (memStopError) {
+        logger.warn('⚠️  Failed to stop in-memory MongoDB server:', memStopError);
+      } finally {
+        memoryServer = null;
+      }
+    }
     
   } catch (error) {
     logger.error('❌ MongoDB disconnection error:', error);

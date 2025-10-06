@@ -1,7 +1,8 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import healthController from "../controllers/healthController";
 import { asyncHandler } from "../utils/errors";
 import { healthCheckBypass } from "../middleware/security";
+import { logger } from "../utils/logger";
 
 const router = Router();
 
@@ -271,11 +272,12 @@ router.get(
  * Error handling for health routes
  * Health routes should be resilient and always return a response
  */
-router.use((error: any, req: any, res: any, _next: any) => {
-  console.error("Health route error:", {
+router.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {
+  logger.error("Health route error:", {
+    error: error instanceof Error ? error.message : "Unknown error",
+    stack: error instanceof Error ? error.stack : undefined,
     path: req.path,
     method: req.method,
-    error: error.message,
   });
 
   // Always return a response for health checks
@@ -284,7 +286,7 @@ router.use((error: any, req: any, res: any, _next: any) => {
       success: false,
       timestamp: new Date().toISOString(),
       error: "Health check failed",
-      message: error.message,
+      message: error instanceof Error ? error.message : String(error),
       path: req.path,
     });
   }

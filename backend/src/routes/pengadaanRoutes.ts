@@ -1,9 +1,10 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import pengadaanController from '../controllers/pengadaanController';
 import { validate, pengadaanSchemas, validateObjectId, validateCustomId } from '../utils/validation';
 import { asyncHandler } from '../utils/errors';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import { authRateLimiter } from '../middleware/security';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -270,10 +271,11 @@ adminRouter.delete(
     const { confirm } = _req.body;
     
     if (confirm !== 'PURGE_ALL_DATA') {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Confirmation required. Send { "confirm": "PURGE_ALL_DATA" } to proceed.',
       });
+      return;
     }
 
     // TODO: Implement data purge functionality
@@ -281,6 +283,7 @@ adminRouter.delete(
       success: false,
       message: 'Data purge functionality not yet implemented',
     });
+    return;
   })
 );
 
@@ -354,12 +357,12 @@ router.use('/public', publicRouter);
 /**
  * Error handling for this router
  */
-router.use((error: any, _req: any, _res: any, next: any) => {
+router.use((error: unknown, _req: Request, _res: Response, next: NextFunction) => {
   // Log the error for debugging
   console.error('Pengadaan route error:', error);
   
   // Pass to global error handler
-  next(error);
+  next(error as Error);
 });
 
 export default router;
@@ -407,3 +410,9 @@ export default router;
  * - Caching headers for appropriate responses
  * - Bulk operations for administrative tasks
  */
+
+logger.info("Pengadaan routes initialized", {
+  totalRoutes: 8,
+  authRequired: true,
+  middleware: ["auth", "validation", "security"]
+});

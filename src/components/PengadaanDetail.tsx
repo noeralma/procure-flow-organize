@@ -4,20 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Pengadaan } from "@/types/pengadaan";
+import { formatCurrency } from "@/lib/utils";
 
 interface PengadaanDetailProps {
+  pengadaan: Pengadaan;
   onClose: () => void;
-  pengadaan: any;
 }
 
 export const PengadaanDetail = ({ onClose, pengadaan }: PengadaanDetailProps) => {
   if (!pengadaan) return null;
-
-  const formatCurrency = (amount: string, currency: string = "IDR") => {
-    if (!amount) return "-";
-    const symbol = currency === "USD" ? "$" : "Rp ";
-    return `${symbol}${parseFloat(amount).toLocaleString()}`;
-  };
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "-";

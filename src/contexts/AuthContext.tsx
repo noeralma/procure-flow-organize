@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from '@/hooks/use-toast';
 
 export interface User {
@@ -11,7 +11,7 @@ export interface User {
   updatedAt: string;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
@@ -24,7 +24,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier: email, password }),
       });
 
       const data = await response.json();
@@ -108,10 +108,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return false;
       }
     } catch (error) {
-      console.error('Login error:', error);
       toast({
         title: 'Login Error',
-        description: 'Network error. Please try again.',
+        description: error instanceof Error ? error.message : 'Network error. Please try again.',
         variant: 'destructive',
       });
       return false;
@@ -150,10 +149,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return false;
       }
     } catch (error) {
-      console.error('Registration error:', error);
       toast({
         title: 'Registration Error',
-        description: 'Network error. Please try again.',
+        description: error instanceof Error ? error.message : 'Network error. Please try again.',
         variant: 'destructive',
       });
       return false;
@@ -203,13 +201,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return false;
       }
     } catch (error) {
-      console.error('Profile update error:', error);
       toast({
         title: 'Update Error',
-        description: 'Network error. Please try again.',
+        description: error instanceof Error ? error.message : 'Network error. Please try again.',
         variant: 'destructive',
       });
       return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -235,10 +234,4 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 };
 
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export default AuthContext;

@@ -43,6 +43,11 @@ const extractToken = (req: Request): string | null => {
     return authHeader.substring(7);
   }
   
+  // Check for x-auth-token header
+  if (req.headers['x-auth-token'] && typeof req.headers['x-auth-token'] === 'string') {
+    return req.headers['x-auth-token'];
+  }
+  
   // Also check for token in cookies (if using cookie-based auth)
   if (req.cookies && req.cookies.token) {
     return req.cookies.token;
@@ -77,7 +82,7 @@ const verifyToken = (token: string): Promise<JWTPayload> => {
  */
 export const authenticate = async (
   req: AuthenticatedRequest,
-  _res: Response,
+  res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
@@ -92,7 +97,11 @@ export const authenticate = async (
         requestId,
       });
       
-      throw new AuthenticationError('Access token is required');
+      res.status(401).json({
+        success: false,
+        message: 'Access denied. No token provided.',
+      });
+      return;
     }
     
     // Verify token
@@ -101,12 +110,20 @@ export const authenticate = async (
     // Get user from database to verify they still exist and are active
     const user = await UserModel.findById(decoded.userId);
     if (!user) {
-      throw new AuthenticationError('User not found');
+      res.status(401).json({
+        success: false,
+        message: 'Invalid token.',
+      });
+      return;
     }
 
     // Check if user is active
     if (user.status !== UserStatus.ACTIVE) {
-      throw new AuthenticationError('Account is not active');
+      res.status(401).json({
+        success: false,
+        message: 'Account is not active',
+      });
+      return;
     }
 
     // Check if password was changed after token was issued
@@ -116,14 +133,18 @@ export const authenticate = async (
     if (decoded.iat && user.passwordChangedAt) {
       const passwordChangedTimestamp = Math.floor(user.passwordChangedAt.getTime() / 1000);
       if (decoded.iat < passwordChangedTimestamp) {
-        throw new AuthenticationError('Token is invalid due to recent password change');
+        res.status(401).json({
+          success: false,
+          message: 'Token is invalid due to recent password change',
+        });
+        return;
       }
     }
     */
     
     // Add user information to request
     req.user = {
-      id: (user._id as any).toString(),
+      id: String(user._id),
       email: user.email,
       role: user.role,
       status: user.status,
@@ -151,15 +172,10 @@ export const authenticate = async (
       requestId,
     });
     
-    if (error instanceof jwt.JsonWebTokenError) {
-      next(new AuthenticationError('Invalid token'));
-    } else if (error instanceof jwt.TokenExpiredError) {
-      next(new AuthenticationError('Token expired'));
-    } else if (error instanceof jwt.NotBeforeError) {
-      next(new AuthenticationError('Token not active'));
-    } else {
-      next(error);
-    }
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token.',
+    });
   }
 };
 
@@ -202,7 +218,7 @@ export const optionalAuthenticate = async (
 export const authorize = (
   roles?: UserRole[]
 ) => {
-  return (req: AuthenticatedRequest, _res: Response, next: NextFunction): void => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     const requestId = getRequestId(req);
     
     if (!req.user) {
@@ -212,7 +228,11 @@ export const authorize = (
         requestId,
       });
       
-      throw new AuthenticationError('Authentication required');
+      res.status(403).json({
+        success: false,
+        message: 'Access denied. Insufficient permissions.',
+      });
+      return;
     }
     
     const { role } = req.user;
@@ -229,7 +249,11 @@ export const authorize = (
           requestId,
         });
         
-        throw new AuthorizationError('Insufficient permissions');
+        res.status(403).json({
+          success: false,
+          message: 'Access denied. Insufficient permissions.',
+        });
+        return;
       }
     }
     
@@ -413,7 +437,7 @@ export const generateRefreshToken = (
  */
 export const verifyRefreshToken = (token: string): Promise<JWTPayload> => {
   return new Promise((resolve, reject) => {
-    jwt.verify(token, config.jwtRefreshSecret, (err: any, decoded: any) => {
+    jwt.verify(token, config.jwtRefreshSecret, (err, decoded) => {
       if (err) {
         reject(err);
       } else {

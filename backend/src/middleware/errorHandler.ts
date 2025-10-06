@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import {
   AppError,
-  createErrorResponse,
   isOperationalError,
   logError,
   handleMongoError,
@@ -21,6 +20,19 @@ export const errorHandler = (
   _next: NextFunction
 ): void => {
   const requestId = getRequestId(req);
+  
+  // Add debug logging for tests
+  if (process.env['NODE_ENV'] === 'test') {
+    // Use console.log to ensure output isn't suppressed by test console mocks
+    console.log('Error handler caught:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      requestId,
+      method: req.method,
+      path: req.path
+    });
+  }
   
   // Log the error
   logError(error, {
@@ -43,7 +55,7 @@ export const errorHandler = (
   } else if (error.name === 'SyntaxError' && 'body' in error) {
     appError = new AppError('Invalid JSON format', 400);
   } else if (error.name === 'MulterError') {
-    appError = handleMulterError(error as any);
+    appError = handleMulterError(error);
   } else {
     // Unknown error - don't expose details in production
     const message = process.env['NODE_ENV'] === 'production' 
@@ -53,23 +65,23 @@ export const errorHandler = (
     appError = new AppError(message, 500, error.message, false);
   }
 
-  // Create error response
-  const errorResponse = createErrorResponse(
-    appError,
-    req.path,
-    req.method,
+  // Send error response using consistent format
+  sendError(
+    res,
+    appError.message,
+    appError.statusCode,
+    appError.details,
     requestId
   );
-
-  // Send error response
-  res.status(appError.statusCode).json(errorResponse);
 };
 
 /**
  * Handle Multer (file upload) errors
  */
-const handleMulterError = (error: any): AppError => {
-  switch (error.code) {
+type MulterErrorLike = { code?: string; message?: string };
+const handleMulterError = (error: unknown): AppError => {
+  const err = (typeof error === 'object' && error !== null) ? (error as MulterErrorLike) : {};
+  switch (err.code) {
     case 'LIMIT_FILE_SIZE':
       return new AppError('File too large', 400, 'File size exceeds the allowed limit');
     case 'LIMIT_FILE_COUNT':
@@ -85,7 +97,7 @@ const handleMulterError = (error: any): AppError => {
     case 'LIMIT_PART_COUNT':
       return new AppError('Too many parts', 400, 'Number of parts exceeds the allowed limit');
     default:
-      return new AppError('File upload error', 400, error.message);
+      return new AppError('File upload error', 400, err.message);
   }
 };
 
@@ -122,7 +134,7 @@ export const notFoundHandler = (
  * Wraps async route handlers to catch errors automatically
  */
 export const asyncHandler = (
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>
 ) => {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
@@ -134,19 +146,20 @@ export const asyncHandler = (
  * Specifically for handling validation errors
  */
 export const validationErrorHandler = (
-  error: any,
+  error: unknown,
   req: Request,
   res: Response,
   _next: NextFunction
 ): void => {
-  if (error.name === 'ValidationError') {
+  const err = (typeof error === 'object' && error !== null) ? (error as { name?: string; message?: string; details?: unknown }) : {};
+  if (err.name === 'ValidationError') {
     const requestId = getRequestId(req);
     
     sendError(
       res,
-      error.message,
+      err.message ?? 'Validation error',
       400,
-      error.details,
+      typeof err.details === 'string' ? err.details : undefined,
       requestId
     );
     return;
@@ -186,12 +199,13 @@ export const rateLimitErrorHandler = (
  * CORS error handler
  */
 export const corsErrorHandler = (
-  error: any,
+  error: unknown,
   req: Request,
   res: Response,
   next: NextFunction
 ): void => {
-  if (error.message && error.message.includes('CORS')) {
+  const err = (typeof error === 'object' && error !== null) ? (error as { message?: string }) : {};
+  if (err.message && err.message.includes('CORS')) {
     const requestId = getRequestId(req);
     
     logger.warn('CORS error:', {
@@ -218,12 +232,13 @@ export const corsErrorHandler = (
  * Timeout error handler
  */
 export const timeoutErrorHandler = (
-  error: any,
+  error: unknown,
   req: Request,
   res: Response,
   next: NextFunction
 ): void => {
-  if (error.code === 'TIMEOUT' || error.message?.includes('timeout')) {
+  const err = (typeof error === 'object' && error !== null) ? (error as { code?: string; message?: string }) : {};
+  if (err.code === 'TIMEOUT' || err.message?.includes('timeout')) {
     const requestId = getRequestId(req);
     
     logger.warn('Request timeout:', {
@@ -250,16 +265,17 @@ export const timeoutErrorHandler = (
  * Database connection error handler
  */
 export const dbErrorHandler = (
-  error: any,
+  error: unknown,
   req: Request,
   res: Response,
   next: NextFunction
 ): void => {
-  if (error.name === 'MongoNetworkError' || error.name === 'MongoTimeoutError') {
+  const err = (typeof error === 'object' && error !== null) ? (error as { name?: string; message?: string }) : {};
+  if (err.name === 'MongoNetworkError' || err.name === 'MongoTimeoutError') {
     const requestId = getRequestId(req);
     
     logger.error('Database connection error:', {
-      error: error.message,
+      error: err.message,
       method: req.method,
       path: req.path,
       requestId,
@@ -371,11 +387,12 @@ export const errorMiddlewareChain = [
 /**
  * Graceful shutdown handler
  */
-export const gracefulShutdown = (server: any) => {
+import { Server } from 'http';
+export const gracefulShutdown = (server: Server) => {
   return (signal: string) => {
     logger.info(`Received ${signal}, starting graceful shutdown...`);
     
-    server.close((err: any) => {
+    server.close((err?: Error | null) => {
       if (err) {
         logger.error('Error during server shutdown:', err);
         process.exit(1);
@@ -396,12 +413,12 @@ export const gracefulShutdown = (server: any) => {
 /**
  * Setup process error handlers
  */
-export const setupProcessErrorHandlers = (server?: any) => {
+export const setupProcessErrorHandlers = (server?: Server) => {
   // Handle unhandled promise rejections
-  process.on('unhandledRejection', (reason: any, _promise: Promise<any>) => {
+  process.on('unhandledRejection', (reason: unknown, _promise: Promise<unknown>) => {
     logger.error('Unhandled Promise Rejection:', {
-      reason: reason?.message || reason,
-      stack: reason?.stack,
+      reason: (reason as { message?: string })?.message || reason,
+      stack: (reason as { stack?: string })?.stack,
     });
     
     if (server) {

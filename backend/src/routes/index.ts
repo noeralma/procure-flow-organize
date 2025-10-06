@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { config } from '../config/environment';
 import { sendSuccess, sendNotFound } from '../utils/response';
 import { asyncHandler } from '../utils/errors';
@@ -313,15 +313,15 @@ router.use(
 /**
  * Error handling for API routes
  */
-router.use((error: any, _req: any, _res: any, next: any) => {
+router.use((error: unknown, _req: Request, _res: Response, next: NextFunction) => {
   console.error('API route error:', {
     path: _req.path,
     method: _req.method,
-    error: error.message,
-    stack: error.stack,
+    error: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
   });
   
-  next(error);
+  next(error as Error);
 });
 
 export default router;

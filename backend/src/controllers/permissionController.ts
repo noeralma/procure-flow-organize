@@ -6,7 +6,7 @@ import { AppError } from '../utils/errors';
 import { sendSuccess as successResponse } from '../utils/response';
 
 // Helper function for validation
-const validateRequired = (fields: Record<string, any>) => {
+const validateRequired = (fields: Record<string, unknown>) => {
   for (const [key, value] of Object.entries(fields)) {
     if (!value || (typeof value === 'string' && value.trim() === '')) {
       throw new AppError(`${key} is required`, 400);
@@ -186,7 +186,9 @@ class PermissionController {
       const permission = await permissionService.getPermissionById(permissionId);
 
       // Users can only view their own permissions, admins can view all
-      if (req.user.role !== UserRole.ADMIN && (permission as any).userId.toString() !== req.user.id) {
+      const permissionUserId = (permission as { userId?: unknown }).userId;
+      const permissionUserIdStr = String(permissionUserId);
+      if (req.user.role !== UserRole.ADMIN && permissionUserIdStr !== req.user.id) {
         throw new AppError('Access denied. You can only view your own permissions.', 403);
       }
 

@@ -6,7 +6,7 @@ import { sendSuccess as successResponse } from '../utils/response';
 import { commonSchemas } from '../utils/validation';
 
 // Helper functions for validation
-const validateRequired = (fields: Record<string, any>) => {
+const validateRequired = (fields: Record<string, unknown>) => {
   for (const [key, value] of Object.entries(fields)) {
     if (!value || (typeof value === 'string' && value.trim() === '')) {
       throw new AppError(`${key} is required`, 400);
@@ -22,8 +22,12 @@ const validateEmail = (email: string) => {
 };
 
 const validatePassword = (password: string) => {
-  if (password.length < 6) {
-    throw new AppError('Password must be at least 6 characters long', 400);
+  if (password.length < 8) {
+    throw new AppError('Password must be at least 8 characters long', 400);
+  }
+  
+  if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(password)) {
+    throw new AppError('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)', 400);
   }
 };
 
@@ -42,6 +46,8 @@ class AuthController {
    */
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      console.log('Register endpoint called with data:', req.body);
+      
       const {
         username,
         email,
@@ -51,6 +57,7 @@ class AuthController {
         department,
         position,
         phoneNumber,
+        role,
       } = req.body;
 
       // Validation
@@ -71,12 +78,16 @@ class AuthController {
         department: department?.trim(),
         position: position?.trim(),
         phoneNumber: phoneNumber?.trim(),
+        role,
       };
 
+      console.log('Calling authService.register...');
       const result = await authService.register(registerData);
 
+      console.log('Registration successful:', result);
       successResponse(res, result, 'User registered successfully', 201);
     } catch (error) {
+      console.error('Registration error:', error);
       next(error);
     }
   }
@@ -115,7 +126,7 @@ class AuthController {
 
       const profile = await authService.getProfile(req.user.id);
 
-      successResponse(res, profile, 'Profile retrieved successfully');
+      successResponse(res, { user: profile }, 'Profile retrieved successfully');
     } catch (error) {
       next(error);
     }
@@ -379,21 +390,21 @@ class AuthController {
   /**
    * Refresh token (if implementing refresh token logic)
    */
-  async refreshToken(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  async refreshToken(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      if (!req.user) {
-        throw new AppError('User not authenticated', 401);
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        throw new AppError('Refresh token is required', 400);
       }
 
-      // Get fresh user data and generate new token
-      const profile = await authService.getProfile(req.user.id);
+      // Verify refresh token and get user data
+      const decoded = await authService.verifyRefreshToken(refreshToken);
       
-      // In a real implementation, you might want to verify the refresh token
-      // For now, we'll generate a new access token
-      // Get user profile for token refresh (removing unused variable)
-      await authService.getProfile(req.user.id);
+      // Get fresh user data and generate new tokens
+      const result = await authService.refreshToken(decoded.userId);
       
-      successResponse(res, { user: profile }, 'Token refreshed successfully');
+      successResponse(res, result, 'Token refreshed successfully');
     } catch (error) {
       next(error);
     }

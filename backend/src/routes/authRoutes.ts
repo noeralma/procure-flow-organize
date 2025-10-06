@@ -30,9 +30,9 @@ router.post('/refresh', asyncHandler(authController.refreshToken));
 /**
  * @route   POST /api/auth/logout
  * @desc    Logout user
- * @access  Public
+ * @access  Private
  */
-router.post('/logout', asyncHandler(authController.logout));
+router.post('/logout', authenticate, asyncHandler(authController.logout));
 
 // Protected routes (authentication required)
 /**

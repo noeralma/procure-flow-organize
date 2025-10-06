@@ -1,23 +1,31 @@
-import { useState } from "react";
-import { Plus, Search, Filter, Edit, Trash2, Eye, Lock } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Plus, Search, Filter, Eye, Edit, Trash2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { PengadaanForm } from "./PengadaanForm";
 import { PengadaanDetail } from "./PengadaanDetail";
-import { PermissionRequestDialog } from "./permissions/PermissionRequestDialog";
 import { useGetPengadaan, useDeletePengadaan } from "@/services/pengadaan";
-import { useCheckEditPermission } from "@/services/permission";
-import { useAuth } from "@/contexts/AuthContext";
+import { Pengadaan } from "@/types/pengadaan";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { PermissionRequestDialog } from "@/components/permissions/PermissionRequestDialog";
 
 export const Pengadaan = () => {
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedPengadaan, setSelectedPengadaan] = useState<any>(null);
+  const [selectedPengadaan, setSelectedPengadaan] = useState<Pengadaan | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -37,7 +45,7 @@ export const Pengadaan = () => {
     }
   };
 
-  const handleEdit = (pengadaan: any) => {
+  const handleEdit = (pengadaan: Pengadaan) => {
     setSelectedPengadaan(pengadaan);
     
     // Check if user is admin or has permission
@@ -54,7 +62,7 @@ export const Pengadaan = () => {
     setShowForm(true);
   };
 
-  const handleViewDetail = (pengadaan: any) => {
+  const handleViewDetail = (pengadaan: Pengadaan) => {
     setSelectedPengadaan(pengadaan);
     setShowDetail(true);
   };
@@ -78,7 +86,7 @@ export const Pengadaan = () => {
   };
 
   const filteredData = pengadaanData.filter(
-    (item: any) =>
+    (item: Pengadaan) =>
       item.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.vendor.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -137,7 +145,7 @@ export const Pengadaan = () => {
 
       {/* Data Table */}
       <div className="grid gap-4">
-        {filteredData.map((item: any) => (
+        {filteredData.map((item: Pengadaan) => (
           <Card
             key={item.id}
             className="border-0 shadow hover:shadow-md transition-shadow"

@@ -51,10 +51,6 @@ export interface IUserModel extends Model<IUserDocument> {
 // User Schema
 const userSchema = new Schema<IUserDocument>(
   {
-    id: {
-      type: String,
-      required: true,
-    },
     username: {
       type: String,
       required: [true, 'Username is required'],
@@ -73,7 +69,13 @@ const userSchema = new Schema<IUserDocument>(
     password: {
       type: String,
       required: [true, 'Password is required'],
-      minlength: [6, 'Password must be at least 6 characters long'],
+      minlength: [8, 'Password must be at least 8 characters long'],
+      validate: {
+        validator: function(password: string) {
+          return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(password);
+        },
+        message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'
+      },
       select: false, // Don't include password in queries by default
     },
     firstName: {
@@ -126,51 +128,41 @@ const userSchema = new Schema<IUserDocument>(
     phoneNumber: {
       type: String,
       trim: true,
-      match: [/^[\+]?[1-9][\d]{0,15}$/, 'Please enter a valid phone number'],
+      match: [/^\+?[1-9]\d{0,15}$/u, 'Please enter a valid phone number'],
     },
   },
   {
     timestamps: true,
     versionKey: false,
     toJSON: {
-      transform: (_doc, ret: any) => {
-        delete ret._id;
-        delete ret.password;
+      transform: (_doc, ret: Record<string, unknown>) => {
+        ret['id'] = String(ret['_id']);
+        delete ret['_id'];
+        delete ret['password'];
         return ret;
       },
     },
     toObject: {
-      transform: (_doc, ret: any) => {
-        delete ret._id;
-        delete ret.password;
+      transform: (_doc, ret: Record<string, unknown>) => {
+        ret['id'] = String(ret['_id']);
+        delete ret['_id'];
+        delete ret['password'];
         return ret;
       },
     },
   }
 );
 
-// Custom ID generator for User
-const generateUserId = async (): Promise<string> => {
-  const count = await UserModel.countDocuments();
-  return `USR-${String(count + 1).padStart(4, '0')}`;
-};
-
 // Indexes
-userSchema.index({ id: 1 }, { unique: true });
 userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ username: 1 }, { unique: true });
 userSchema.index({ role: 1 });
 userSchema.index({ status: 1 });
 userSchema.index({ createdAt: -1 });
 
-// Pre-save middleware to hash password and generate ID
+// Pre-save middleware to hash password
 userSchema.pre('save', async function (next) {
   const user = this as IUserDocument;
-
-  // Generate custom ID if not provided
-  if (!user.id) {
-    user.id = await generateUserId();
-  }
 
   // Hash password if it's modified
   if (user.isModified('password')) {
@@ -191,12 +183,16 @@ userSchema.methods['comparePassword'] = async function (candidatePassword: strin
 userSchema.methods['generateAuthToken'] = function (): string {
   const user = this as IUserDocument;
   const payload = {
-    id: user.id,
+    userId: user.id,
     email: user.email,
     role: user.role,
   };
   
-  const secret = process.env['JWT_SECRET'] || 'fallback-secret-key';
+  const secret = process.env['JWT_SECRET'];
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  
   const expiresIn = process.env['JWT_EXPIRES_IN'] || '7d';
   
   return jwt.sign(payload, secret, { expiresIn } as jwt.SignOptions);
@@ -206,7 +202,7 @@ userSchema.methods['generateAuthToken'] = function (): string {
 userSchema.methods['toResponse'] = function (): object {
   const user = this as IUserDocument;
   return {
-    id: user.id,
+    id: String(user._id),
     username: user.username,
     email: user.email,
     firstName: user.firstName,
@@ -258,4 +254,3 @@ userSchema.statics['findByCredentials'] = async function (identifier: string, pa
 const UserModel: IUserModel = mongoose.model<IUserDocument, IUserModel>('User', userSchema);
 
 export default UserModel;
-export { generateUserId };

@@ -1,26 +1,27 @@
-import { Request, Response, NextFunction } from 'express';
-import pengadaanService from '../services/pengadaanService';
+import { Request, Response, NextFunction } from "express";
+import { ParsedQs } from "qs";
+import pengadaanService from "../services/pengadaanService";
 import {
   sendSuccess,
   sendCreated,
   sendNoContent,
   sendPaginated,
   getRequestId,
-} from '../utils/response';
-import { NotFoundError, ValidationError } from '../utils/errors';
-import { logger } from '../utils/logger';
+} from "../utils/response";
+import { NotFoundError, ValidationError } from "../utils/errors";
+import { logger } from "../utils/logger";
 import {
   ValidatedCreatePengadaan,
   ValidatedUpdatePengadaan,
-} from '../utils/validation';
-import { AuthenticatedRequest } from '../middleware/auth';
+} from "../utils/validation";
+import { AuthenticatedRequest } from "../middleware/auth";
 
 /**
  * Extended request interface for pengadaan operations
  */
 interface PengadaanRequest extends AuthenticatedRequest {
   body: ValidatedCreatePengadaan | ValidatedUpdatePengadaan;
-  query: any; // Use any to avoid strict typing issues with Express query
+  query: ParsedQs;
 }
 
 /**
@@ -33,35 +34,53 @@ export const getAllPengadaan = async (
 ): Promise<void> => {
   try {
     const requestId = getRequestId(req);
-    const {
-      page = 1,
-      limit = 10,
-      search,
-      status,
-      kategori,
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
-      startDate,
-      endDate,
-    } = req.query;
+    const page = Number(req.query["page"] ?? 1);
+    const limit = Number(req.query["limit"] ?? 10);
+    const search =
+      typeof req.query["search"] === "string" ? req.query["search"] : undefined;
+    const status =
+      typeof req.query["status"] === "string" ? req.query["status"] : undefined;
+    const kategori =
+      typeof req.query["kategori"] === "string"
+        ? req.query["kategori"]
+        : undefined;
+    const sortBy =
+      typeof req.query["sortBy"] === "string"
+        ? req.query["sortBy"]
+        : "createdAt";
+    const sortOrderRaw =
+      typeof req.query["sortOrder"] === "string"
+        ? req.query["sortOrder"]
+        : "desc";
+    const sortOrder: "asc" | "desc" = sortOrderRaw === "asc" ? "asc" : "desc";
+    const startDate =
+      typeof req.query["startDate"] === "string"
+        ? req.query["startDate"]
+        : undefined;
+    const endDate =
+      typeof req.query["endDate"] === "string"
+        ? req.query["endDate"]
+        : undefined;
 
-    logger.debug('Getting all pengadaan', {
+    logger.debug("Getting all pengadaan", {
       requestId,
       query: req.query,
       userId: req.user?.id,
     });
 
-    const result = await pengadaanService.getAllPengadaan({
-      page: Number(page),
-      limit: Number(limit),
-      search,
-      status,
-      kategori,
+    const params: import("../types/pengadaan").PengadaanQueryParams = {
+      page,
+      limit,
       sortBy,
       sortOrder,
-      dateFrom: startDate,
-      dateTo: endDate,
-    });
+    };
+    if (startDate) params.dateFrom = startDate;
+    if (endDate) params.dateTo = endDate;
+    if (search) params.search = search;
+    if (status) params.status = status;
+    if (kategori) params.kategori = kategori;
+
+    const result = await pengadaanService.getAllPengadaan(params);
 
     sendPaginated(
       res,
@@ -69,7 +88,7 @@ export const getAllPengadaan = async (
       result.pagination.page,
       result.pagination.limit,
       result.pagination.total,
-      'Pengadaan data retrieved successfully',
+      "Pengadaan data retrieved successfully",
       requestId
     );
   } catch (error) {
@@ -87,17 +106,17 @@ export const getPengadaanById = async (
 ): Promise<void> => {
   try {
     const requestId = getRequestId(req);
-    const id = req.params['id'] as string;
+    const id = req.params["id"] as string;
 
     if (!id) {
-      throw new ValidationError('ID is required');
+      throw new ValidationError("ID is required");
     }
 
     if (!id) {
-      throw new ValidationError('ID is required');
+      throw new ValidationError("ID is required");
     }
 
-    logger.debug('Getting pengadaan by ID', {
+    logger.debug("Getting pengadaan by ID", {
       requestId,
       pengadaanId: id,
       userId: (req as AuthenticatedRequest).user?.id,
@@ -106,13 +125,13 @@ export const getPengadaanById = async (
     const pengadaan = await pengadaanService.getPengadaanById(id);
 
     if (!pengadaan) {
-      throw new NotFoundError('Pengadaan');
+      throw new NotFoundError("Pengadaan");
     }
 
     sendSuccess(
       res,
       pengadaan,
-      'Pengadaan retrieved successfully',
+      "Pengadaan retrieved successfully",
       200,
       undefined,
       requestId
@@ -134,7 +153,7 @@ export const createPengadaan = async (
     const requestId = getRequestId(req);
     const pengadaanData = req.body as ValidatedCreatePengadaan;
 
-    logger.debug('Creating new pengadaan', {
+    logger.debug("Creating new pengadaan", {
       requestId,
       nama: pengadaanData.nama,
       kategori: pengadaanData.kategori,
@@ -142,21 +161,18 @@ export const createPengadaan = async (
       userId: req.user?.id,
     });
 
-    const newPengadaan = await pengadaanService.createPengadaan(pengadaanData as any);
+    const newPengadaan = await pengadaanService.createPengadaan(
+      pengadaanData
+    );
 
-    logger.info('Pengadaan created successfully', {
+    logger.info("Pengadaan created successfully", {
       requestId,
       pengadaanId: newPengadaan.id,
       nama: newPengadaan.nama,
       userId: req.user?.id,
     });
 
-    sendCreated(
-      res,
-      newPengadaan,
-      'Pengadaan created successfully',
-      requestId
-    );
+    sendCreated(res, newPengadaan, "Pengadaan created successfully", requestId);
   } catch (error) {
     next(error);
   }
@@ -172,27 +188,30 @@ export const updatePengadaan = async (
 ): Promise<void> => {
   try {
     const requestId = getRequestId(req);
-    const id = req.params['id'] as string;
+    const id = req.params["id"] as string;
 
     if (!id) {
-      throw new ValidationError('ID is required');
+      throw new ValidationError("ID is required");
     }
     const updateData = req.body as ValidatedUpdatePengadaan;
 
-    logger.debug('Updating pengadaan', {
+    logger.debug("Updating pengadaan", {
       requestId,
       pengadaanId: id,
       updateFields: Object.keys(updateData),
       userId: req.user?.id,
     });
 
-    const updatedPengadaan = await pengadaanService.updatePengadaan(id, updateData as any);
+    const updatedPengadaan = await pengadaanService.updatePengadaan(
+      id,
+      updateData
+    );
 
     if (!updatedPengadaan) {
-      throw new NotFoundError('Pengadaan');
+      throw new NotFoundError("Pengadaan");
     }
 
-    logger.info('Pengadaan updated successfully', {
+    logger.info("Pengadaan updated successfully", {
       requestId,
       pengadaanId: id,
       nama: updatedPengadaan.nama,
@@ -202,7 +221,7 @@ export const updatePengadaan = async (
     sendSuccess(
       res,
       updatedPengadaan,
-      'Pengadaan updated successfully',
+      "Pengadaan updated successfully",
       200,
       undefined,
       requestId
@@ -222,13 +241,13 @@ export const deletePengadaan = async (
 ): Promise<void> => {
   try {
     const requestId = getRequestId(req);
-    const id = req.params['id'] as string;
+    const id = req.params["id"] as string;
 
     if (!id) {
-      throw new ValidationError('ID is required');
+      throw new ValidationError("ID is required");
     }
 
-    logger.debug('Deleting pengadaan', {
+    logger.debug("Deleting pengadaan", {
       requestId,
       pengadaanId: id,
       userId: (req as AuthenticatedRequest).user?.id,
@@ -236,13 +255,13 @@ export const deletePengadaan = async (
 
     await pengadaanService.deletePengadaan(id);
 
-    logger.info('Pengadaan deleted successfully', {
+    logger.info("Pengadaan deleted successfully", {
       requestId,
       pengadaanId: id,
       userId: (req as AuthenticatedRequest).user?.id,
     });
 
-    sendNoContent(res, 'Pengadaan deleted successfully', requestId);
+    sendNoContent(res, "Pengadaan deleted successfully", requestId);
   } catch (error) {
     next(error);
   }
@@ -259,7 +278,7 @@ export const getPengadaanStats = async (
   try {
     const requestId = getRequestId(req);
 
-    logger.debug('Getting pengadaan statistics', {
+    logger.debug("Getting pengadaan statistics", {
       requestId,
       userId: (req as AuthenticatedRequest).user?.id,
     });
@@ -269,7 +288,7 @@ export const getPengadaanStats = async (
     sendSuccess(
       res,
       stats,
-      'Pengadaan statistics retrieved successfully',
+      "Pengadaan statistics retrieved successfully",
       200,
       undefined,
       requestId
@@ -289,25 +308,27 @@ export const searchPengadaan = async (
 ): Promise<void> => {
   try {
     const requestId = getRequestId(req);
-    const { q: query, limit = 10 } = req.query;
+    const query =
+      typeof req.query["q"] === "string" ? req.query["q"] : undefined;
+    const limit = Number(req.query["limit"] ?? 10);
 
-    if (!query || typeof query !== 'string') {
-      throw new ValidationError('Search query is required', 'q', query);
+    if (!query || typeof query !== "string") {
+      throw new ValidationError("Search query is required", "q", query);
     }
 
-    logger.debug('Searching pengadaan', {
+    logger.debug("Searching pengadaan", {
       requestId,
       query,
       limit,
       userId: req.user?.id,
     });
 
-    const results = await pengadaanService.searchPengadaan(query, Number(limit));
+    const results = await pengadaanService.searchPengadaan(query, limit);
 
     sendSuccess(
       res,
       results,
-      'Search completed successfully',
+      "Search completed successfully",
       200,
       undefined,
       requestId
@@ -331,13 +352,13 @@ export const bulkCreatePengadaan = async (
 
     if (!Array.isArray(pengadaanList) || pengadaanList.length === 0) {
       throw new ValidationError(
-        'pengadaanList must be a non-empty array',
-        'pengadaanList',
+        "pengadaanList must be a non-empty array",
+        "pengadaanList",
         pengadaanList
       );
     }
 
-    logger.debug('Bulk creating pengadaan', {
+    logger.debug("Bulk creating pengadaan", {
       requestId,
       count: pengadaanList.length,
       userId: (req as AuthenticatedRequest).user?.id,
@@ -345,23 +366,28 @@ export const bulkCreatePengadaan = async (
 
     // Since bulkCreatePengadaan doesn't exist in service, we'll create individually
     const results = {
-      success: [] as any[],
-      errors: [] as { data: any; error: string }[]
+      success: [] as import("../types/pengadaan").PengadaanResponse[],
+      errors: [] as {
+        data: import("../types/pengadaan").CreatePengadaanDTO;
+        error: string;
+      }[],
     };
 
     for (const pengadaanData of pengadaanList) {
       try {
-        const created = await pengadaanService.createPengadaan(pengadaanData);
+        const created = await pengadaanService.createPengadaan(
+          pengadaanData as import("../types/pengadaan").CreatePengadaanDTO
+        );
         results.success.push(created);
       } catch (error) {
         results.errors.push({
           data: pengadaanData,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
     }
 
-    logger.info('Bulk pengadaan creation completed', {
+    logger.info("Bulk pengadaan creation completed", {
       requestId,
       totalRequested: pengadaanList.length,
       successCount: results.success.length,
@@ -394,13 +420,13 @@ export const bulkUpdatePengadaan = async (
 
     if (!Array.isArray(updates) || updates.length === 0) {
       throw new ValidationError(
-        'updates must be a non-empty array',
-        'updates',
+        "updates must be a non-empty array",
+        "updates",
         updates
       );
     }
 
-    logger.debug('Bulk updating pengadaan', {
+    logger.debug("Bulk updating pengadaan", {
       requestId,
       count: updates.length,
       userId: (req as AuthenticatedRequest).user?.id,
@@ -408,23 +434,26 @@ export const bulkUpdatePengadaan = async (
 
     // Since bulkUpdatePengadaan doesn't exist in service, we'll update individually
     const results = {
-      success: [] as any[],
-      errors: [] as { id: string; error: string }[]
+      success: [] as import("../types/pengadaan").PengadaanResponse[],
+      errors: [] as { id: string; error: string }[],
     };
 
     for (const update of updates) {
       try {
-        const updated = await pengadaanService.updatePengadaan(update.id, update.data);
+        const updated = await pengadaanService.updatePengadaan(
+          update.id,
+          update.data
+        );
         results.success.push(updated);
       } catch (error) {
         results.errors.push({
           id: update.id,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
     }
 
-    logger.info('Bulk pengadaan update completed', {
+    logger.info("Bulk pengadaan update completed", {
       requestId,
       totalRequested: updates.length,
       successCount: results.success.length,
@@ -458,14 +487,10 @@ export const bulkDeletePengadaan = async (
     const { ids } = req.body;
 
     if (!Array.isArray(ids) || ids.length === 0) {
-      throw new ValidationError(
-        'ids must be a non-empty array',
-        'ids',
-        ids
-      );
+      throw new ValidationError("ids must be a non-empty array", "ids", ids);
     }
 
-    logger.debug('Bulk deleting pengadaan', {
+    logger.debug("Bulk deleting pengadaan", {
       requestId,
       count: ids.length,
       ids,
@@ -475,7 +500,7 @@ export const bulkDeletePengadaan = async (
     // Since bulkDeletePengadaan doesn't exist in service, we'll delete individually
     const results = {
       success: [] as string[],
-      errors: [] as { id: string; error: string }[]
+      errors: [] as { id: string; error: string }[],
     };
 
     for (const id of ids) {
@@ -485,12 +510,12 @@ export const bulkDeletePengadaan = async (
       } catch (error) {
         results.errors.push({
           id,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
     }
 
-    logger.info('Bulk pengadaan deletion completed', {
+    logger.info("Bulk pengadaan deletion completed", {
       requestId,
       totalRequested: ids.length,
       successCount: results.success.length,
@@ -521,9 +546,54 @@ export const exportPengadaan = async (
 ): Promise<void> => {
   try {
     const requestId = getRequestId(req);
-    const { format = 'json', ...filters } = req.query;
+    const format =
+      typeof req.query["format"] === "string" ? req.query["format"] : "json";
+    const filters: {
+      search?: string;
+      status?: string;
+      kategori?: string;
+      sortBy?: string;
+      sortOrder?: "asc" | "desc";
+      dateFrom?: string;
+      dateTo?: string;
+    } = {};
+    const search =
+      typeof req.query["search"] === "string" ? req.query["search"] : undefined;
+    const status =
+      typeof req.query["status"] === "string" ? req.query["status"] : undefined;
+    const kategori =
+      typeof req.query["kategori"] === "string"
+        ? req.query["kategori"]
+        : undefined;
+    const sortBy =
+      typeof req.query["sortBy"] === "string" ? req.query["sortBy"] : undefined;
+    const sortOrderStr =
+      typeof req.query["sortOrder"] === "string"
+        ? req.query["sortOrder"]
+        : undefined;
+    const sortOrder: "asc" | "desc" | undefined =
+      sortOrderStr === "asc"
+        ? "asc"
+        : sortOrderStr === "desc"
+        ? "desc"
+        : undefined;
+    const dateFrom =
+      typeof req.query["startDate"] === "string"
+        ? req.query["startDate"]
+        : undefined;
+    const dateTo =
+      typeof req.query["endDate"] === "string"
+        ? req.query["endDate"]
+        : undefined;
+    if (search) filters.search = search;
+    if (status) filters.status = status;
+    if (kategori) filters.kategori = kategori;
+    if (sortBy) filters.sortBy = sortBy;
+    if (sortOrder) filters.sortOrder = sortOrder;
+    if (dateFrom) filters.dateFrom = dateFrom;
+    if (dateTo) filters.dateTo = dateTo;
 
-    logger.debug('Exporting pengadaan data', {
+    logger.debug("Exporting pengadaan data", {
       requestId,
       format,
       filters,
@@ -537,31 +607,45 @@ export const exportPengadaan = async (
       limit: 10000, // Large limit for export
     });
 
-    const filename = `pengadaan_export_${new Date().toISOString().split('T')[0]}`;
+    const filename = `pengadaan_export_${
+      new Date().toISOString().split("T")[0]
+    }`;
 
     switch (format) {
-      case 'csv':
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`);
+      case "csv":
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${filename}.csv"`
+        );
         // TODO: Implement CSV conversion
-        res.send('CSV export not implemented yet');
+        res.send("CSV export not implemented yet");
         break;
 
-      case 'excel':
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}.xlsx"`);
+      case "excel":
+        res.setHeader(
+          "Content-Type",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${filename}.xlsx"`
+        );
         // TODO: Implement Excel conversion
-        res.send('Excel export not implemented yet');
+        res.send("Excel export not implemented yet");
         break;
 
-      case 'json':
+      case "json":
       default:
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${filename}.json"`
+        );
         sendSuccess(
           res,
           result.data,
-          'Data exported successfully',
+          "Data exported successfully",
           200,
           undefined,
           requestId
@@ -569,7 +653,7 @@ export const exportPengadaan = async (
         break;
     }
 
-    logger.info('Pengadaan data exported', {
+    logger.info("Pengadaan data exported", {
       requestId,
       format,
       recordCount: result.data.length,
@@ -593,10 +677,10 @@ export const getPengadaanByCustomId = async (
     const { customId } = req.params;
 
     if (!customId) {
-      throw new ValidationError('Custom ID is required');
+      throw new ValidationError("Custom ID is required");
     }
 
-    logger.debug('Getting pengadaan by custom ID', {
+    logger.debug("Getting pengadaan by custom ID", {
       requestId,
       customId,
       userId: (req as AuthenticatedRequest).user?.id,
@@ -605,13 +689,13 @@ export const getPengadaanByCustomId = async (
     const pengadaan = await pengadaanService.getPengadaanById(customId);
 
     if (!pengadaan) {
-      throw new NotFoundError('Pengadaan');
+      throw new NotFoundError("Pengadaan");
     }
 
     sendSuccess(
       res,
       pengadaan,
-      'Pengadaan retrieved successfully',
+      "Pengadaan retrieved successfully",
       200,
       undefined,
       requestId
@@ -631,9 +715,9 @@ export const getRecentActivity = async (
 ): Promise<void> => {
   try {
     const requestId = getRequestId(req);
-    const { limit = 10 } = req.query;
+    const limit = Number((req.query as Record<string, unknown>)["limit"] ?? 10);
 
-    logger.debug('Getting recent pengadaan activity', {
+    logger.debug("Getting recent pengadaan activity", {
       requestId,
       limit,
       userId: (req as AuthenticatedRequest).user?.id,
@@ -643,13 +727,13 @@ export const getRecentActivity = async (
     const stats = await pengadaanService.getPengadaanStats();
     const recentActivity = {
       recent: stats.recentActivity || { created: 0, updated: 0, completed: 0 },
-      limit: Number(limit)
+      limit,
     };
 
     sendSuccess(
       res,
       recentActivity,
-      'Recent activity retrieved successfully',
+      "Recent activity retrieved successfully",
       200,
       undefined,
       requestId

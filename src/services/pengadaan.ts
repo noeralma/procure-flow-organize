@@ -1,70 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Pengadaan, CreatePengadaanDTO, UpdatePengadaanDTO, PaginatedPengadaanResponse, PengadaanStats } from '@/types/pengadaan';
+import { ApiClient } from '@/services/api';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const API_VERSION = 'v1';
 const BASE_URL = `${API_BASE_URL}/api/${API_VERSION}`;
 
-// API Client
-class ApiClient {
-  private baseUrl: string;
-
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
-  }
-
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
-    const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    try {
-      const response = await fetch(url, config);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || `HTTP error! status: ${response.status}`
-        );
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('API request failed:', error);
-      throw error;
-    }
-  }
-
-  async get<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'GET' });
-  }
-
-  async post<T>(endpoint: string, data: any): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async put<T>(endpoint: string, data: any): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async delete<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
-  }
-}
+// API Client is now shared in '@/services/api'
 
 const apiClient = new ApiClient(BASE_URL);
 
@@ -87,80 +30,7 @@ interface PaginatedResponse<T> {
   message?: string;
 }
 
-interface Pengadaan {
-  id: string;
-  // Legacy fields for backward compatibility
-  nama: string;
-  kategori: string;
-  deskripsi: string;
-  vendor: string;
-  nilai: string;
-  status: string;
-  tanggal: string;
-  deadline: string;
-  
-  // Section 1: DATA UMUM PENGADAAN
-  sinergi: string;
-  namaPaket: string;
-  lapPtm: string;
-  sla?: string;
-  tahunSla?: string;
-  costSaving?: string;
-  tahunCostSaving?: string;
-  barangJasa: string;
-
-  // Section 2: PROSES PERSIAPAN PENGADAAN
-  penggunaBarangJasa: string;
-  jenisPaket: string;
-  jenisPengadaan: string;
-  baseline: string;
-  noPpl: string;
-  metodePengadaan: string;
-  tahunAnggaran: string;
-  jenisAnggaran: string;
-  jenisKontrak: string;
-  nilaiAnggaranIdr?: string;
-  nilaiAnggaranUsd?: string;
-  nilaiHpsCurrency: string;
-  nilaiHpsAmount: string;
-  nilaiHpsEqRupiah: string;
-  nilaiHpsPortiTahun: string;
-  bulanPermintaan: string;
-  tanggalPermintaan: string;
-  tanggalPermintaanDiterima: string;
-  tanggalRapatPersiapan: string;
-  tanggalRevisiPermintaan?: string;
-  lamaRevisiPermintaan?: string;
-  noPurchaseRequisition: string;
-  tanggalPurchaseRequisition: string;
-  jenisMySap: string;
-  tanggalPerintahPengadaan: string;
-  lamaProsesPersiapan: string;
-  kategoriRisiko: string;
-  keteranganPersiapan?: string;
-  picTimPpsm: string;
-
-  // Section 3: PROSES PENGADAAN
-  suratPenunjukan: string;
-  lamaProsesPengadaan: string;
-  jangkaWaktuPengerjaan?: string;
-  nilaiPenunjukanCurrency: string;
-  nilaiPenunjukanAmount: string;
-  nilaiPenunjukanEqRupiah: string;
-  statusPengadaan: string;
-  bulanSelesai: string;
-  keteranganPengadaan?: string;
-
-  // Section 4: PROSES KONTRAK
-  costSavingRp?: string;
-  nilaiKontrakRupiah?: string;
-  nilaiKontrakUsd?: string;
-  nilaiKontrakPortiTahun?: string;
-  penyediaBarangJasa: string;
-  statusPenyedia: string;
-  kontrakNomor: string;
-  kontrakTanggal: string;
-}
+// Use Pengadaan type from '@/types/pengadaan' to avoid duplicate interface conflicts
 
 // API Service Functions
 const pengadaanService = {
@@ -174,12 +44,12 @@ const pengadaanService = {
     return response.data;
   },
 
-  async create(data: Omit<Pengadaan, 'id'>): Promise<Pengadaan> {
+  async create(data: CreatePengadaanDTO): Promise<Pengadaan> {
     const response = await apiClient.post<ApiResponse<Pengadaan>>('/pengadaan', data);
     return response.data;
   },
 
-  async update(id: string, data: Partial<Pengadaan>): Promise<Pengadaan> {
+  async update(id: string, data: UpdatePengadaanDTO): Promise<Pengadaan> {
     const response = await apiClient.put<ApiResponse<Pengadaan>>(`/pengadaan/${id}`, data);
     return response.data;
   },
@@ -193,10 +63,10 @@ const pengadaanService = {
     return response.data;
   },
 
-  async getStats(): Promise<any> {
-    const response = await apiClient.get<ApiResponse<any>>('/pengadaan/stats');
+  async getStats(): Promise<PengadaanStats> {
+    const response = await apiClient.get<ApiResponse<PengadaanStats>>('/pengadaan/stats');
     return response.data;
-  }
+  },
 };
 
 // React Query Hooks
@@ -222,7 +92,7 @@ export const useGetPengadaanById = (id: string) => {
 export const useCreatePengadaan = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<Pengadaan, Error, Omit<Pengadaan, "id">>({
+  return useMutation<Pengadaan, Error, CreatePengadaanDTO>({
     mutationFn: pengadaanService.create,
     onSuccess: (newPengadaan) => {
       // Update the cache with the new item
@@ -233,7 +103,8 @@ export const useCreatePengadaan = () => {
       queryClient.invalidateQueries({ queryKey: ["pengadaan"] });
     },
     onError: (error) => {
-      console.error('Failed to create pengadaan:', error);
+      // Improved error handling without console.log
+      throw new Error(error instanceof Error ? error.message : 'Failed to create pengadaan');
     },
   });
 };
@@ -241,7 +112,7 @@ export const useCreatePengadaan = () => {
 export const useUpdatePengadaan = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<Pengadaan, Error, { id: string; data: Partial<Pengadaan> }>({
+  return useMutation<Pengadaan, Error, { id: string; data: UpdatePengadaanDTO }>({
     mutationFn: ({ id, data }) => pengadaanService.update(id, data),
     onSuccess: (updatedPengadaan) => {
       // Update the cache
@@ -256,7 +127,8 @@ export const useUpdatePengadaan = () => {
       queryClient.invalidateQueries({ queryKey: ["pengadaan"] });
     },
     onError: (error) => {
-      console.error('Failed to update pengadaan:', error);
+      // Improved error handling without console.log
+      throw new Error(error instanceof Error ? error.message : 'Failed to update pengadaan');
     },
   });
 };
@@ -277,7 +149,8 @@ export const useDeletePengadaan = () => {
       queryClient.invalidateQueries({ queryKey: ["pengadaan"] });
     },
     onError: (error) => {
-      console.error('Failed to delete pengadaan:', error);
+      // Improved error handling without console.log
+      throw new Error(error instanceof Error ? error.message : 'Failed to delete pengadaan');
     },
   });
 };

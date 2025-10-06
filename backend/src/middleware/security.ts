@@ -1,19 +1,21 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { ParamsDictionary } from 'express-serve-static-core';
+import { ParsedQs } from 'qs';
 import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
 import { config } from '../config/environment';
 import { RateLimitError } from '../utils/errors';
-import { getRequestId } from '../utils/response';
+import { getRequestId, RequestWithId } from '../utils/response';
 
 /**
  * Request ID middleware
  * Adds a unique ID to each request for tracking
  */
-export const requestId = (req: Request, res: Response, next: NextFunction): void => {
+export const requestId = (req: RequestWithId, res: Response, next: NextFunction): void => {
   const id = uuidv4();
-  (req as any).id = id;
+  req.id = id;
   res.setHeader('X-Request-ID', id);
   next();
 };
@@ -22,7 +24,7 @@ export const requestId = (req: Request, res: Response, next: NextFunction): void
  * Request logging middleware
  * Logs incoming requests with relevant information
  */
-export const requestLogger = (req: any, res: Response, next: NextFunction): void => {
+export const requestLogger = (req: RequestWithId, res: Response, next: NextFunction): void => {
   const startTime = Date.now();
   const requestId = getRequestId(req);
   
@@ -130,7 +132,7 @@ export const authRateLimiter = rateLimit({
  * Speed limiting middleware
  * Slows down requests when rate limit is approached
  */
-export const speedLimiter: any = slowDown({
+export const speedLimiter: RequestHandler = slowDown({
   windowMs: config.rateLimitWindowMs,
   delayAfter: Math.floor(config.rateLimitMaxRequests * 0.8), // Start slowing down at 80% of limit
   delayMs: () => 500, // Add 500ms delay per request (updated for v2 compatibility)
@@ -138,7 +140,7 @@ export const speedLimiter: any = slowDown({
   skip: (req: Request) => {
     return req.path === '/health' || req.path === '/api/health';
   },
-});
+}) as unknown as RequestHandler;
 
 /**
  * Security headers middleware
@@ -178,8 +180,8 @@ export const securityHeaders = (req: Request, res: Response, next: NextFunction)
  * Input sanitization middleware
  * Sanitizes request data to prevent injection attacks
  */
-export const sanitizeInput = (req: any, _res: Response, next: NextFunction): void => {
-  const sanitize = (obj: any): any => {
+export const sanitizeInput = (req: Request, _res: Response, next: NextFunction): void => {
+  const sanitize = (obj: unknown): unknown => {
     if (typeof obj === 'string') {
       return obj
         .trim()
@@ -188,12 +190,12 @@ export const sanitizeInput = (req: any, _res: Response, next: NextFunction): voi
     }
     
     if (Array.isArray(obj)) {
-      return obj.map(sanitize);
+      return (obj as unknown[]).map(sanitize);
     }
     
     if (obj && typeof obj === 'object') {
-      const sanitized: any = {};
-      for (const [key, value] of Object.entries(obj)) {
+      const sanitized: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
         // Prevent prototype pollution
         if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
           continue;
@@ -211,11 +213,11 @@ export const sanitizeInput = (req: any, _res: Response, next: NextFunction): voi
   }
   
   if (req.query) {
-    req.query = sanitize(req.query);
+    req.query = sanitize(req.query) as ParsedQs;
   }
   
   if (req.params) {
-    req.params = sanitize(req.params);
+    req.params = sanitize(req.params) as ParamsDictionary;
   }
   
   next();
@@ -394,11 +396,24 @@ export const requestTimeout = (timeoutMs: number = 30000) => {
  * Handles Cross-Origin Resource Sharing
  */
 export const corsConfig = (req: Request, res: Response, next: NextFunction): void => {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', config.corsOrigin.join(', '));
+  // Set CORS headers (single origin only; lists are invalid per spec)
+  const requestOrigin = req.headers['origin'] as string | undefined;
+  const allowed = Array.isArray(config.corsOrigin) ? config.corsOrigin : [config.corsOrigin];
+
+  // Ensure caches differentiate per Origin
+  res.setHeader('Vary', 'Origin');
+
+  if (requestOrigin && allowed.includes(requestOrigin)) {
+    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else if (allowed.length === 1 && typeof allowed[0] === 'string') {
+    // Fallback to single configured origin when request has no Origin header
+    res.setHeader('Access-Control-Allow-Origin', allowed[0]);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-API-Key');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
   
   // Handle preflight requests
@@ -414,9 +429,12 @@ export const corsConfig = (req: Request, res: Response, next: NextFunction): voi
  * API versioning middleware
  * Handles API version routing
  */
-export const apiVersioning = (req: any, res: Response, next: NextFunction): void => {
-  const version = req.headers['api-version'] || req.query.version || config.apiVersion;
-  req.apiVersion = version;
+interface RequestWithVersion extends Request {
+  apiVersion?: string | string[];
+}
+export const apiVersioning = (req: Request, res: Response, next: NextFunction): void => {
+  const version = (req.headers['api-version'] as string | undefined) || (req.query['version'] as string | undefined) || config.apiVersion;
+  (req as RequestWithVersion).apiVersion = version;
   res.setHeader('API-Version', version);
   next();
 };
@@ -427,7 +445,7 @@ export const apiVersioning = (req: any, res: Response, next: NextFunction): void
  */
 export const healthCheckBypass = (req: Request, _res: Response, next: NextFunction): void => {
   if (req.path === '/health' || req.path === '/api/health') {
-    (req as any).isHealthCheck = true;
+    (req as unknown as { isHealthCheck?: boolean }).isHealthCheck = true;
   }
   next();
 };

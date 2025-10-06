@@ -147,7 +147,8 @@ const migration_002_add_indexes: Migration = {
       const collection = mongoose.connection.collection('pengadaans');
       
       // Create indexes
-      const indexes: any[] = [
+      type IndexSpec = Record<string, 1 | -1 | 'text'>;
+      const indexes: IndexSpec[] = [
         { customId: 1 },
         { status: 1 },
         { kategori: 1 },
@@ -271,8 +272,12 @@ const migration_003_normalize_currency: Migration = {
       
       for (const pengadaan of pengadaanToUpdate) {
         try {
-          const updateData: any = {};
-          const pengadaanData = pengadaan as any;
+          const updateData: Record<string, unknown> = {};
+          type PengadaanDocPartial = {
+            dataUmumPengadaan?: { nilaiTotal?: number | { amount: number; currency: string } };
+            prosesKontrak?: { penetapanPemenang?: { nilaiKontrak?: number | { amount: number; currency: string } } };
+          };
+          const pengadaanData = pengadaan as unknown as PengadaanDocPartial;
           
           // Update nilaiTotal if it's a number
           if (pengadaanData.dataUmumPengadaan?.nilaiTotal && typeof pengadaanData.dataUmumPengadaan.nilaiTotal === 'number') {
@@ -338,8 +343,12 @@ const migration_003_normalize_currency: Migration = {
       
       for (const pengadaan of pengadaanToRevert) {
         try {
-          const updateData: any = {};
-          const pengadaanData = pengadaan as any;
+          const updateData: Record<string, unknown> = {};
+          type PengadaanDocPartial = {
+            dataUmumPengadaan?: { nilaiTotal?: { amount?: number } };
+            prosesKontrak?: { penetapanPemenang?: { nilaiKontrak?: { amount?: number } } };
+          };
+          const pengadaanData = pengadaan as unknown as PengadaanDocPartial;
           
           if (pengadaanData.dataUmumPengadaan?.nilaiTotal?.amount) {
             updateData['dataUmumPengadaan.nilaiTotal'] = pengadaanData.dataUmumPengadaan.nilaiTotal.amount;
