@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useCreatePengadaan, useUpdatePengadaan } from "@/services/pengadaan";
-import { Pengadaan } from "@/types/pengadaan";
+import type { Pengadaan } from "@/types/pengadaan";
 
 interface PengadaanFormProps {
   onClose: () => void;

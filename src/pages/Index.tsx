@@ -8,7 +8,6 @@ import { Pengaturan } from "@/components/Pengaturan";
 import { UserManagement } from "@/components/admin/UserManagement";
 import { PermissionManagement } from "@/components/permissions/PermissionManagement";
 import { UserPermissions } from "@/components/permissions/UserPermissions";
-import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const [activeMenu, setActiveMenu] = useState("dashboard");

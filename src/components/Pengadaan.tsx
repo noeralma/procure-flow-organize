@@ -15,7 +15,7 @@ import {
 import { PengadaanForm } from "./PengadaanForm";
 import { PengadaanDetail } from "./PengadaanDetail";
 import { useGetPengadaan, useDeletePengadaan } from "@/services/pengadaan";
-import { Pengadaan } from "@/types/pengadaan";
+import type { Pengadaan as PengadaanItem } from "@/types/pengadaan";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { PermissionRequestDialog } from "@/components/permissions/PermissionRequestDialog";
@@ -25,7 +25,7 @@ export const Pengadaan = () => {
   const [showDetail, setShowDetail] = useState(false);
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedPengadaan, setSelectedPengadaan] = useState<Pengadaan | null>(null);
+  const [selectedPengadaan, setSelectedPengadaan] = useState<PengadaanItem | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -45,7 +45,7 @@ export const Pengadaan = () => {
     }
   };
 
-  const handleEdit = (pengadaan: Pengadaan) => {
+  const handleEdit = (pengadaan: PengadaanItem) => {
     setSelectedPengadaan(pengadaan);
     
     // Check if user is admin or has permission
@@ -62,7 +62,7 @@ export const Pengadaan = () => {
     setShowForm(true);
   };
 
-  const handleViewDetail = (pengadaan: Pengadaan) => {
+  const handleViewDetail = (pengadaan: PengadaanItem) => {
     setSelectedPengadaan(pengadaan);
     setShowDetail(true);
   };
@@ -86,7 +86,7 @@ export const Pengadaan = () => {
   };
 
   const filteredData = pengadaanData.filter(
-    (item: Pengadaan) =>
+    (item: PengadaanItem) =>
       item.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.vendor.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -145,7 +145,7 @@ export const Pengadaan = () => {
 
       {/* Data Table */}
       <div className="grid gap-4">
-        {filteredData.map((item: Pengadaan) => (
+        {filteredData.map((item: PengadaanItem) => (
           <Card
             key={item.id}
             className="border-0 shadow hover:shadow-md transition-shadow"

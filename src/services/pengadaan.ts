@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Pengadaan, CreatePengadaanDTO, UpdatePengadaanDTO, PaginatedPengadaanResponse, PengadaanStats } from '@/types/pengadaan';
+import type { Pengadaan, CreatePengadaanDTO, UpdatePengadaanDTO, PaginatedPengadaanResponse, PengadaanStats } from '@/types/pengadaan';
 import { ApiClient } from '@/services/api';
 
 // API Configuration

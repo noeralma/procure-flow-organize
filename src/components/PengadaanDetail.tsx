@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Pengadaan } from "@/types/pengadaan";
+import type { Pengadaan } from "@/types/pengadaan";
 import { formatCurrency } from "@/lib/utils";
 
 interface PengadaanDetailProps {
