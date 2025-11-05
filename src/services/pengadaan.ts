@@ -1,15 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Pengadaan, CreatePengadaanDTO, UpdatePengadaanDTO, PaginatedPengadaanResponse, PengadaanStats } from '@/types/pengadaan';
-import { ApiClient } from '@/services/api';
-
-// API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const API_VERSION = 'v1';
-const BASE_URL = `${API_BASE_URL}/api/${API_VERSION}`;
-
-// API Client is now shared in '@/services/api'
-
-const apiClient = new ApiClient(BASE_URL);
+import { apiClient } from '@/services/api';
 
 // API Response Types
 interface ApiResponse<T> {

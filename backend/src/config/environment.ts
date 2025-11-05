@@ -76,7 +76,6 @@ export const config = {
 
 // Type for configuration
 export type Config = typeof config;
-
 // Validate required secrets in production
 if (config.isProduction) {
   const requiredSecrets = [

@@ -18,12 +18,12 @@ import { useGetPengadaan, useDeletePengadaan } from "@/services/pengadaan";
 import type { Pengadaan as PengadaanItem } from "@/types/pengadaan";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { PermissionRequestDialog } from "@/components/permissions/PermissionRequestDialog";
+// Permission request dialog removed for simplification
 
 export const Pengadaan = () => {
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
-  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  // Permission request dialog removed; show toast for non-admin edit attempts
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPengadaan, setSelectedPengadaan] = useState<PengadaanItem | null>(null);
   const { toast } = useToast();
@@ -52,15 +52,12 @@ export const Pengadaan = () => {
     if (user?.role === 'admin') {
       setShowForm(true);
     } else {
-      // For regular users, check if they have permission or show permission request dialog
-      setShowPermissionDialog(true);
+      // For regular users, prevent edit and inform user
+      toast({ title: 'Akses ditolak', description: 'Anda tidak memiliki izin untuk mengedit pengadaan ini.' });
     }
   };
 
-  const handlePermissionGranted = () => {
-    setShowPermissionDialog(false);
-    setShowForm(true);
-  };
+  // Permission flow removed
 
   const handleViewDetail = (pengadaan: PengadaanItem) => {
     setSelectedPengadaan(pengadaan);
@@ -211,14 +208,7 @@ export const Pengadaan = () => {
         />
       )}
 
-      {showPermissionDialog && selectedPengadaan && (
-        <PermissionRequestDialog
-          open={showPermissionDialog}
-          onOpenChange={setShowPermissionDialog}
-          pengadaanId={selectedPengadaan.id}
-          pengadaanName={selectedPengadaan.nama}
-        />
-      )}
+      {/* Permission dialog removed */}
     </div>
   );
 };

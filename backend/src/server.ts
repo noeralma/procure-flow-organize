@@ -9,7 +9,6 @@ import { connectDatabase } from '@/config/database';
 import { errorHandler } from '@/middleware/errorHandler';
 import { notFoundHandler } from '@/middleware/errorHandler';
 import { requestLogger } from '@/middleware/security';
-import pengadaanRoutes from '@/routes/pengadaanRoutes';
 import apiRoutes from '@/routes/index';
 import healthRoutes from '@/routes/healthRoutes';
 import { logger } from '@/utils/logger';
@@ -84,11 +83,8 @@ class Server {
     // Health check
     this.app.use('/health', healthRoutes);
 
-    // Mount main API routes synchronously
-    this.app.use(config.apiPrefix, apiRoutes);
-
-    // API routes (legacy - will be moved to index.ts)
-    this.app.use(`${config.apiPrefix}/${config.apiVersion}/pengadaan`, pengadaanRoutes);
+    // Mount main API routes under versioned prefix for consistency
+    this.app.use(`${config.apiPrefix}/${config.apiVersion}`, apiRoutes);
 
     // Root endpoint
     this.app.get('/', (_req, res) => {

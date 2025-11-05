@@ -63,6 +63,6 @@ export class ApiClient {
   }
 }
 
-// Default API base for non-versioned endpoints
-const ROOT_API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
+// Default API base for versioned endpoints (unify to v1)
+const ROOT_API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/v1`;
 export const apiClient = new ApiClient(ROOT_API_BASE);

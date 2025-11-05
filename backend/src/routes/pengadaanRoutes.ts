@@ -366,7 +366,6 @@ router.use((error: unknown, _req: Request, _res: Response, next: NextFunction) =
 });
 
 export default router;
-
 /**
  * Route documentation
  * 

@@ -7,7 +7,6 @@ import { asyncHandler } from '../utils/errors';
 import pengadaanRoutes from './pengadaanRoutes';
 import healthRoutes from './healthRoutes';
 import authRoutes from './authRoutes';
-import permissionRoutes from './permissionRoutes';
 
 // Create main router
 const router = Router();
@@ -18,7 +17,7 @@ const router = Router();
  * @desc    API information and available endpoints
  * @access  Public
  */
-router.get(
+  router.get(
   '/',
   asyncHandler(async (_req, res, _next) => {
     const apiInfo = {
@@ -104,8 +103,7 @@ router.use('/health', healthRoutes);
 // Authentication routes
 router.use('/auth', authRoutes);
 
-// Permission routes
-router.use('/permissions', permissionRoutes);
+// Permissions module removed for simplification
 
 // Pengadaan routes
 router.use('/pengadaan', pengadaanRoutes);
@@ -189,7 +187,7 @@ router.get(
       },
       servers: [
         {
-          url: `http://localhost:${config.port}/api`,
+          url: `http://localhost:${config.port}/api/${config.apiVersion}`,
           description: 'Development server',
         },
       ],
@@ -262,7 +260,7 @@ router.get(
       variable: [
         {
           key: 'base_url',
-          value: `http://localhost:${config.port}/api`,
+          value: `http://localhost:${config.port}/api/${config.apiVersion}`,
           type: 'string',
         },
         {
@@ -325,7 +323,6 @@ router.use((error: unknown, _req: Request, _res: Response, next: NextFunction) =
 });
 
 export default router;
-
 /**
  * Routes Index Documentation
  * 
