@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { apiClient } from '@/services/api';
 
 export interface User {
   id: string;
@@ -30,8 +31,6 @@ export interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
-
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -59,18 +58,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setIsLoading(false);
         return;
       }
-
-      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
+      try {
+        const data: any = await apiClient.get('/auth/profile');
         setUser(data.data.user);
-      } else {
+      } catch (err) {
         // Token is invalid, remove it
         localStorage.removeItem('authToken');
         setUser(null);
@@ -87,17 +78,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ identifier: email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
+      try {
+        const data: any = await apiClient.post('/auth/login', { identifier: email, password });
         localStorage.setItem('authToken', data.data.token);
         setUser(data.data.user);
         toast({
@@ -105,10 +87,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           description: `Welcome back, ${data.data.user.username}!`,
         });
         return true;
-      } else {
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Invalid credentials';
         toast({
           title: 'Login Failed',
-          description: data.message || 'Invalid credentials',
+          description: message,
           variant: 'destructive',
         });
         return false;
@@ -134,17 +117,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   ): Promise<boolean> => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, email, password, firstName, lastName }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
+      try {
+        const data: any = await apiClient.post('/auth/register', { username, email, password, firstName, lastName });
         localStorage.setItem('authToken', data.data.token);
         setUser(data.data.user);
         toast({
@@ -152,10 +126,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           description: `Welcome, ${data.data.user.username}!`,
         });
         return true;
-      } else {
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Registration failed';
         toast({
           title: 'Registration Failed',
-          description: data.message || 'Registration failed',
+          description: message,
           variant: 'destructive',
         });
         return false;
@@ -186,28 +161,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const token = localStorage.getItem('authToken');
       if (!token) return false;
 
-      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
+      try {
+        const result: any = await apiClient.put('/auth/profile', data);
         setUser(result.data.user);
         toast({
           title: 'Profile Updated',
           description: 'Your profile has been successfully updated.',
         });
         return true;
-      } else {
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to update profile';
         toast({
           title: 'Update Failed',
-          description: result.message || 'Failed to update profile',
+          description: message,
           variant: 'destructive',
         });
         return false;
