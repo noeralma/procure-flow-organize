@@ -16,7 +16,7 @@ export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (identifier: string, password: string) => Promise<boolean>;
   register: (
     username: string,
     email: string,
@@ -75,11 +75,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (identifier: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
       try {
-        const data: any = await apiClient.post('/auth/login', { identifier: email, password });
+        const data: any = await apiClient.post('/auth/login', { identifier, password });
         localStorage.setItem('authToken', data.data.token);
         setUser(data.data.user);
         toast({
@@ -89,9 +89,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return true;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Invalid credentials';
+        const help = message.toLowerCase().includes('invalid credentials')
+          ? 'Check your email/username and password. If you don\'t have an account yet, please register.'
+          : undefined;
         toast({
           title: 'Login Failed',
-          description: message,
+          description: help ? `${message}. ${help}` : message,
           variant: 'destructive',
         });
         return false;
