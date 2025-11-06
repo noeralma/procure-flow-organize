@@ -9,12 +9,12 @@ import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 
 interface LoginFormData {
-  email: string;
+  identifier: string;
   password: string;
 }
 
 interface LoginFormErrors {
-  email?: string;
+  identifier?: string;
   password?: string;
   general?: string;
 }
@@ -24,7 +24,7 @@ export const LoginForm: React.FC = () => {
   const { login, isLoading } = useAuth();
   
   const [formData, setFormData] = useState<LoginFormData>({
-    email: '',
+    identifier: '',
     password: '',
   });
   
@@ -34,11 +34,9 @@ export const LoginForm: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: LoginFormErrors = {};
 
-    // Email validation
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+    // Identifier validation (email or username)
+    if (!formData.identifier.trim()) {
+      newErrors.identifier = 'Email or username is required';
     }
 
     // Password validation
@@ -76,7 +74,7 @@ export const LoginForm: React.FC = () => {
     }
 
     try {
-      const success = await login(formData.email, formData.password);
+      const success = await login(formData.identifier, formData.password);
       if (success) {
         navigate('/');
       }
@@ -106,19 +104,19 @@ export const LoginForm: React.FC = () => {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="identifier">Email or Username</Label>
               <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="Enter your email"
-                value={formData.email}
+                id="identifier"
+                name="identifier"
+                type="text"
+                placeholder="Enter your email or username"
+                value={formData.identifier}
                 onChange={handleInputChange}
-                className={errors.email ? 'border-red-500' : ''}
+                className={errors.identifier ? 'border-red-500' : ''}
                 disabled={isLoading}
               />
-              {errors.email && (
-                <p className="text-sm text-red-500">{errors.email}</p>
+              {errors.identifier && (
+                <p className="text-sm text-red-500">{errors.identifier}</p>
               )}
             </div>
 
