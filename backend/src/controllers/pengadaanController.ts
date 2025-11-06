@@ -152,6 +152,14 @@ export const createPengadaan = async (
   try {
     const requestId = getRequestId(req);
     const pengadaanData = req.body as ValidatedCreatePengadaan;
+    const userId = (req as AuthenticatedRequest).user?.id;
+
+    // Ensure createdBy is set from the authenticated user and default status if missing
+    const payload = {
+      ...pengadaanData,
+      createdBy: userId,
+      status: pengadaanData.status ?? 'Draft',
+    } as ValidatedCreatePengadaan & { createdBy?: string; status?: string };
 
     logger.debug("Creating new pengadaan", {
       requestId,
@@ -161,9 +169,7 @@ export const createPengadaan = async (
       userId: req.user?.id,
     });
 
-    const newPengadaan = await pengadaanService.createPengadaan(
-      pengadaanData
-    );
+    const newPengadaan = await pengadaanService.createPengadaan(payload as unknown as Record<string, unknown>);
 
     logger.info("Pengadaan created successfully", {
       requestId,

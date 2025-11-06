@@ -11,8 +11,6 @@ const items = [
   { key: 'laporan', label: 'Laporan' },
   { key: 'pengaturan', label: 'Pengaturan' },
   { key: 'user-management', label: 'User Management' },
-  { key: 'permission-management', label: 'Permission Management' },
-  { key: 'my-permissions', label: 'My Permissions' },
 ];
 
 export const Sidebar: React.FC<Props> = ({ activeMenu, setActiveMenu }) => {

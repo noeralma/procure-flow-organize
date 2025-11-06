@@ -6,8 +6,6 @@ import { Pengadaan } from "@/components/Pengadaan";
 import { Laporan } from "@/components/Laporan";
 import { Pengaturan } from "@/components/Pengaturan";
 import { UserManagement } from "@/components/admin/UserManagement";
-import { PermissionManagement } from "@/components/permissions/PermissionManagement";
-import { UserPermissions } from "@/components/permissions/UserPermissions";
 
 const Index = () => {
   const [activeMenu, setActiveMenu] = useState("dashboard");
@@ -24,10 +22,6 @@ const Index = () => {
         return <Pengaturan />;
       case "user-management":
         return <UserManagement />;
-      case "permission-management":
-        return <PermissionManagement />;
-      case "my-permissions":
-        return <UserPermissions />;
       case "profile":
         return <div className="p-6">Profile page coming soon...</div>;
       default:
