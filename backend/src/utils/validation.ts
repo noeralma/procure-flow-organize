@@ -21,18 +21,19 @@ export const validate = (schema: ZodSchema, location: Location = 'body') => {
 };
 
 // Sanitization utility to strip MongoDB operators from inputs
-export const sanitizeInput = (input: unknown): unknown => {
+// Preserve the input type for better TypeScript ergonomics in callers/tests
+export const sanitizeInput = <T>(input: T): T => {
   if (Array.isArray(input)) {
-    return input.map((item) => sanitizeInput(item));
+    return (input.map((item) => sanitizeInput(item)) as unknown) as T;
   }
   if (input && typeof input === 'object') {
     const obj = input as Record<string, unknown>;
     const sanitized: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       if (key.startsWith('$')) continue; // strip MongoDB operators
-      sanitized[key] = sanitizeInput(value);
+      sanitized[key] = sanitizeInput(value as unknown);
     }
-    return sanitized;
+    return sanitized as unknown as T;
   }
   return input;
 };
