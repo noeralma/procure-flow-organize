@@ -9,7 +9,10 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 // Lazy-loaded routes to reduce initial bundle size
-const LoginForm = lazy(() => import("@/components/auth/LoginForm"));
+// LoginForm is a named export; map it to default for React.lazy
+const LoginForm = lazy(() =>
+  import("@/components/auth/LoginForm").then((m) => ({ default: m.LoginForm }))
+);
 const RegisterForm = lazy(() => import("@/components/auth/RegisterForm"));
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
